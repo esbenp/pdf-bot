@@ -1,0 +1,32 @@
+{
+  "name": "pdf-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "example:api": "DEBUG=pdf:* node ./example/example.api.js",
+    "example:cli": "DEBUG=pdf:* node ./example/example.cli.js",
+    "test": "mocha test/*.test.js --check-leaks",
+    "test:watch": "mocha -w test/*.test.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "cli-table": "^0.3.1",
+    "commander": "^2.11.0",
+    "crypto": "0.0.3",
+    "debug": "^2.6.8",
+    "express": "^4.15.3",
+    "html-pdf-chrome": "^0.2.0",
+    "lowdb": "^0.16.2",
+    "node-fetch": "^1.7.1",
+    "s3": "^4.4.0",
+    "uuid": "^3.1.0"
+  },
+  "devDependencies": {
+    "mocha": "^3.5.0",
+    "sinon": "^3.0.0",
+    "supertest": "^3.0.0"
+  }
+}
