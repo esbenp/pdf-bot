@@ -5,11 +5,11 @@ var error = require('./error')
 var webhook = require('./webhook')
 var utils = require('./utils')
 
-function createQueue (path = '../storage/db/db.json', options = {}) {
-  var db = low(__dirname + '/' + path, options)
+function createQueue (path, options = {}, initialValue = []) {
+  var db = low(path, options)
 
   db.defaults({
-      queue: []
+      queue: initialValue
     })
     .write()
 
@@ -26,7 +26,6 @@ function createQueue (path = '../storage/db/db.json', options = {}) {
     getById: createQueueMethod(getById),
     getList: createQueueMethod(getList),
     getNext: createQueueMethod(getNext),
-    markAsCompleted: createQueueMethod(markAsCompleted),
     processJob: createQueueMethod(processJob)
   }
 }
@@ -51,9 +50,9 @@ function addToQueue (db, data) {
     id: id,
     created_at: createdAt,
     completed_at: null,
-    generatorTries: -1,
+    generatorTries: 0,
     pings: [],
-    pingTries: -1,
+    pingTries: 0,
     storage: {}
   })
 
@@ -67,16 +66,22 @@ function addToQueue (db, data) {
   return data
 }
 
-function getList (db, failed = false, limit) {
+// =========
+// RETRIEVAL
+// =========
+
+function getList (db, failed = false, pristine = false, limit) {
   var query = db.get('queue')
 
   if (failed) {
+    // Show failed jobs
     query = query.filter(function (job) {
-      return job.completed_at === null || job.generatorTries > -1
+      return job.completed_at === null && job.generatorTries > -1
     })
   } else {
+    // Show completed and optionally new jobs
     query = query.filter(function (job) {
-      return job.completed_at !== null
+      return job.completed_at !== null || (pristine === true && job.generatorTries === -1)
     })
   }
 
@@ -104,7 +109,65 @@ function getNext (db) {
     .value()[0]
 }
 
-function bumpGeneratorTries (db, id) {
+// ==========
+// PROCESSING
+// ==========
+
+function processJob (db, generator, job, webhookOptions) {
+  return generator(job.url, job)
+    .then(response => {
+      if (!error.isError(response)) {
+        debug('Job %s was processed, marking job as complete.', job.id)
+
+        _bumpGeneratorTries(db, job.id)
+        _markAsCompleted(db, job.id)
+        _setStorage(db, job.id, response.storage)
+
+        if (webhookOptions) {
+          // Important to return promise otherwise the npm cli process will exit early
+          return attemptPing(db, job, webhookOptions)
+            .then(function() {
+              return response
+            })
+        }
+      } else {
+        _bumpGeneratorTries(db, job.id)
+      }
+
+      return response
+    })
+}
+
+// =======
+// PINGING
+// =======
+
+function attemptPing (db, job, webhookOptions) {
+  if (!(typeof webhookOptions === 'object')) {
+    throw new Error('No webhook is configured.')
+  }
+
+  return webhook.ping(job, webhookOptions).then(response => {
+    _bumpPingTries(db, job.id)
+    _logPing(db, job.id, response)
+
+    return response
+  })
+}
+
+// ===============
+// PRIVATE METHODS
+// ===============
+
+function _setStorage (db, id, storage) {
+  return db
+    .get('queue')
+    .find({ id: id })
+    .assign({ storage: storage })
+    .write()
+}
+
+function _bumpGeneratorTries (db, id) {
   debug('Bumping tries for job ID %s', id)
 
   var job = getById(db, id)
@@ -116,7 +179,7 @@ function bumpGeneratorTries (db, id) {
     .write()
 }
 
-function bumpPingTries (db, id) {
+function _bumpPingTries (db, id) {
   debug('Bumping ping tries for job ID %s', id)
 
   var job = getById(db, id)
@@ -128,7 +191,7 @@ function bumpPingTries (db, id) {
     .write()
 }
 
-function logPing (db, id, data) {
+function _logPing (db, id, data) {
   debug('Logging ping for job ID %s', id)
 
   var job = getById(db, id)
@@ -143,7 +206,7 @@ function logPing (db, id, data) {
     .write()
 }
 
-function markAsCompleted (db, id) {
+function _markAsCompleted (db, id) {
   var completed_at = utils.getCurrentDateTimeAsString()
 
   debug('Marking job ID %s as completed at %s', id, completed_at)
@@ -155,58 +218,4 @@ function markAsCompleted (db, id) {
     .write()
 }
 
-function processJob (db, generator, job, webhookOptions) {
-  return generator(job.url, job)
-    .then(response => {
-      if (!error.isError(response)) {
-        debug('Job %s was processed, marking job as complete.', job.id)
-
-        markAsCompleted(db, job.id)
-        setStorage(db, job.id, response.storage)
-
-        if (webhookOptions) {
-          // Important to return promise otherwise the npm cli process will exit early
-          return attemptPing(db, job, webhookOptions)
-            .then(function() {
-              return response
-            })
-        }
-      } else {
-        bumpGeneratorTries(db, job.id)
-      }
-
-      return response
-    })
-}
-
-function attemptPing (db, job, webhookOptions) {
-  if (!(typeof webhookOptions === 'object')) {
-    throw new Error('No webhook is configured.')
-  }
-
-  return webhook.ping(job, webhookOptions).then(response => {
-    bumpPingTries(db, job.id)
-    logPing(db, job.id, response)
-
-    return response
-  })
-}
-
-function setStorage (db, id, storage) {
-  return db
-    .get('queue')
-    .find({ id: id })
-    .assign({ storage: storage })
-    .write()
-}
-
-module.exports = {
-  addToQueue: addToQueue,
-  attemptPing: attemptPing,
-  createQueue: createQueue,
-  getById: getById,
-  getList: getList,
-  getNext: getNext,
-  markAsCompleted: markAsCompleted,
-  processJob: processJob
-}
+module.exports = createQueue

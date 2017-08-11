@@ -7,7 +7,7 @@ function createS3Storage(options = {}) {
   }
 
   if (!options.secretAccessKey) {
-    throw new Error('S3: No secret access key givne')
+    throw new Error('S3: No secret access key given')
   }
 
   if (!options.region) {
@@ -32,7 +32,7 @@ function createS3Storage(options = {}) {
         )
       )
 
-      var remotePath = (options.path || '') + localPath
+      var remotePath = (options.path || '')
       if (typeof options.path === 'function') {
         remotePath = options.path(localPath, job)
       }
@@ -40,12 +40,14 @@ function createS3Storage(options = {}) {
       var pathSplitted = localPath.split('/')
       var fileName = pathSplitted[pathSplitted.length - 1]
 
+      var fullRemotePath = remotePath.split('/').concat([fileName]).join('/')
+
       var uploadOptions = {
         localFile: localPath,
 
         s3Params: {
           Bucket: options.bucket,
-          Key: fileName,
+          Key: fullRemotePath,
         },
       }
 

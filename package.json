@@ -1,16 +1,27 @@
 {
-  "name": "pdf-server",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "example:api": "DEBUG=pdf:* node ./example/example.api.js",
-    "example:cli": "DEBUG=pdf:* node ./example/example.cli.js",
-    "test": "mocha test/*.test.js --check-leaks",
-    "test:watch": "mocha -w test/*.test.js"
+  "name": "pdf-bot",
+  "version": "0.1.0",
+  "author": "Esben Petersen <esbenspetersen@gmail.com>",
+  "homepage": "https://github.com/esbenp/pdf-bot",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/esbenp/pdf-bot.git"
   },
-  "author": "",
-  "license": "ISC",
+  "description": "A Node queue API for generating PDFs using headless Chrome. Comes with a CLI, S3 storage and webhooks for notifying subscribers about generated PDFs",
+  "main": "./src/index.js",
+  "bin": "./bin/pdf-bot.js",
+  "files": [
+    "bin/",
+    "src/",
+    "storage/"
+  ],
+  "scripts": {
+    "example": "DEBUG=pdf:* node ./bin/pdf-bot.js --config ./examples/pdf-bot.config.js",
+    "example:receiving-api": "DEBUG=pdf:* node ./examples/receiving-api.js",
+    "test": "mocha test/*.test.js --check-leaks --recursive",
+    "test:watch": "mocha -w test/*.test.js --recursive"
+  },
   "dependencies": {
     "body-parser": "^1.17.2",
     "cli-table": "^0.3.1",
@@ -25,7 +36,9 @@
     "uuid": "^3.1.0"
   },
   "devDependencies": {
+    "assert": "^1.4.1",
     "mocha": "^3.5.0",
+    "proxyquire": "^1.8.0",
     "sinon": "^3.0.0",
     "supertest": "^3.0.0"
   }

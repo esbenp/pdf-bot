@@ -1,0 +1,15 @@
+{
+  "queue": [
+    {
+      "id": 1,
+      "completed_at": "2017-01-01",
+      "generatorTries": 1,
+      "pings": [
+        {
+          "message": "yay"
+        }
+      ],
+      "pingTries": 1
+    }
+  ]
+}

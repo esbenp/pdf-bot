@@ -1,15 +1,15 @@
 var sinon = require('sinon')
 var request = require('supertest')
 var createApi = require('../src/api')
-var utils = require('./utils')
 var error = require('../src/error')
 
 describe('api: POST /', function () {
   var api, queue
   beforeEach(function() {
-    queue = utils.createQueueMock()
-    api = createApi({
-      queue: queue,
+    queue = {
+      addToQueue: sinon.spy()
+    }
+    api = createApi(queue, {
       token: '1234'
     })
   })
@@ -28,12 +28,15 @@ describe('api: POST /', function () {
   })
 
   it('should return 422 on errorneous responses', function(done) {
-    var addToQueue = sinon.stub()
-    addToQueue.onCall(0).returns(error.createErrorResponse(error.ERROR_INVALID_URL))
-
-    queue = utils.createQueueMock(addToQueue)
-    api = createApi({
-      queue: queue,
+    queue = {
+      addToQueue: function() {
+        return {
+          code: '001',
+          error: true
+        }
+      }
+    }
+    api = createApi(queue, {
       token: '1234'
     })
 
@@ -46,6 +49,9 @@ describe('api: POST /', function () {
 
   it('should run the queue with the correct params', function (done) {
     var meta = {id: 1}
+
+    queue.addToQueue = sinon.stub()
+    queue.addToQueue.onCall(0).returns({ id: '1234' })
 
     request(api)
       .post('/')

@@ -3,19 +3,12 @@ var express = require('express')
 var bodyParser = require('body-parser')
 var debug = require('debug')('pdf:api')
 var error = require('./error')
-var queue = require('./queue')
 
-function createApi(options = {}) {
+function createApi(queue, options = {}) {
   var api = express()
   api.use(bodyParser.json())
 
-  var queueInstance = options.queue
-  var queueOptions = options.queueOptions || {}
   var token = options.token
-
-  if (!queueInstance) {
-    queueInstance = queue.createQueue(queueOptions.path, queueOptions.lowDbOptions)
-  }
 
   if (!token) {
     debug('Warning: The server should be protected using a token.')
@@ -29,7 +22,7 @@ function createApi(options = {}) {
       return
     }
 
-    var response = queueInstance.addToQueue({
+    var response = queue.addToQueue({
       url: req.body.url,
       meta: req.body.meta || {}
     })
@@ -40,24 +33,6 @@ function createApi(options = {}) {
     }
 
     res.status(201).json(response)
-  })
-
-  api.post('/hook', function (req, res) {
-    var signature = req.get('X-PDF-Signature', 'sha1=')
-
-    var bodyCrypted = require('crypto')
-      .createHmac('sha1', '12345')
-      .update(JSON.stringify(req.body))
-      .digest('hex')
-
-    if (bodyCrypted !== signature) {
-      res.status(401).send()
-      return
-    }
-
-    console.log('PDF webhook received', JSON.stringify(req.body))
-
-    res.status(204).send()
   })
 
   return api

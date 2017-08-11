@@ -50,28 +50,29 @@ function ping (job, options) {
     JSON.stringify(requestOptions)
   )
 
-  var sent = (new Date()).toUTCString()
+  var sent_at = utils.getCurrentDateTimeAsString()
 
   return fetch(options.url, requestOptions).then(function(response) {
     var emptyCodes = [204, 205]
 
     return Object.assign(
       {
-        id: uuid(),
+        id: requestId,
         status: response.status,
         method: requestOptions.method,
         payload: bodyRaw,
         url: options.url,
-        sent_at: utils.getCurrentDateTimeAsString()
+        sent_at: sent_at
       },
       response.ok
-        ? {response: emptyCodes.indexOf(response.status) !== -1 ? {} : respones.json()}
+        ? {response: emptyCodes.indexOf(response.status) !== -1 ? {} : response.json()}
         : {error: true}
     )
   })
 }
 
 module.exports = {
+  generateSignature: generateSignature,
   ping: ping
 }
 

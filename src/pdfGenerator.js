@@ -21,10 +21,19 @@ function createPdfGenerator(options = {}, storagePlugins = {}) {
         }
         var storagePluginPromises = []
         for (var i in storagePlugins) {
+          // Because i will change before the promise is resolved
+          // we use a self executing function to inject the variable
+          // into a different scope
+          var then = (function(type) {
+            return function (response) {
+              return Object.assign(response, {
+                type: type
+              })
+            }
+          })(i)
+
           storagePluginPromises.push(
-            storagePlugins[i](path, job).then(response => Object.assign(response, {
-              type: i
-            }))
+            storagePlugins[i](path, job).then(then)
           )
         }
 

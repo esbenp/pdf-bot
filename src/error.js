@@ -10,6 +10,10 @@ function isError (response) {
   return response.error && response.code
 }
 
+function getErrorCode(type) {
+  return errorCodes[type]
+}
+
 var ERROR_INVALID_TOKEN = 'ERROR_INVALID_TOKEN'
 var ERROR_INVALID_URL = 'ERROR_INVALID_URL'
 var ERROR_HTML_PDF_CHROME_ERROR = 'ERROR_HTML_PDF_CHROME_ERROR'
@@ -32,7 +36,9 @@ var errorMessages = {
 module.exports = {
   createErrorResponse: createErrorResponse,
   isError: isError,
+  getErrorCode: getErrorCode,
   ERROR_INVALID_TOKEN: ERROR_INVALID_TOKEN,
   ERROR_INVALID_URL: ERROR_INVALID_URL,
-  ERROR_HTML_PDF_CHROME_ERROR: ERROR_HTML_PDF_CHROME_ERROR
+  ERROR_HTML_PDF_CHROME_ERROR: ERROR_HTML_PDF_CHROME_ERROR,
+  ERROR_META_IS_NOT_OBJECT: ERROR_META_IS_NOT_OBJECT
 }
