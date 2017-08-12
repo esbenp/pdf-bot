@@ -12,7 +12,8 @@ var error = require('../src/error')
 var createQueue = require('../src/queue')
 var webhook = require('../src/webhook')
 var pjson = require('../package.json')
-var appRoot = require('app-root-path')
+var execSync = require('child_process').execSync
+var prompt = require('prompt')
 
 program
   .version(pjson.version)
@@ -59,7 +60,7 @@ var defaultConfig = {
     })
     */
   },
-  storagePath: path.join(appRoot.toString(), 'storage'),
+  storagePath: 'storage',
   /*webhook: {
     headerNamespace: 'X-PDF-',
     requestOptions: {
@@ -74,7 +75,7 @@ program
   .command('api')
   .description('Start the API')
   .action(function (options) {
-    createConfig()
+    openConfig()
 
     var apiOptions = configuration.api
     var port = apiOptions.port
@@ -88,13 +89,83 @@ program
   })
 
 program
+  .command('install')
+  .action(function (options) {
+    var configPath = program.config || path.join(process.cwd(), 'pdf-bot.config.js')
+
+    function startPrompt() {
+      prompt.start({noHandleSIGINT: true})
+      prompt.get([
+      {
+        name: 'storagePath',
+        description: 'Enter a path for storage',
+        default: path.join(process.cwd(), 'pdf-storage'),
+        required: true
+      },
+      {
+        name: 'token',
+        description: 'An access token for your API',
+        required: false
+      }], function (err, result) {
+        if (err) {
+          process.exit(0)
+        }
+        var options = {}
+
+        if (result.token) {
+          options.api = {token: result.token}
+        }
+
+        options.storagePath = result.storagePath
+
+        var configContents = "module.exports = " + JSON.stringify(options, null, 2)
+
+        fs.writeFileSync(configPath, configContents)
+
+        if (!fs.existsSync(options.storagePath)) {
+          fs.mkdirSync(options.storagePath, '0775')
+          fs.mkdirSync(path.join(options.storagePath, 'db'), '0775')
+          fs.mkdirSync(path.join(options.storagePath, 'pdf'), '0775')
+        }
+
+        console.log('pdf-bot was installed successfully.')
+        console.log('Config file is placed at ' + configPath + ' and contains')
+        console.log(configContents)
+        console.log('You should add ALIAS pdf-bot="pdf-bot -c ' + configPath + '" to your ~/.profile')
+      });
+    }
+
+    var existingConfigFileFound = fs.existsSync(configPath)
+    if (existingConfigFileFound) {
+      prompt.start({noHandleSIGINT: true})
+      prompt.get([
+        {
+          name: 'replaceConfig',
+          description: 'A config file already exists, are you sure you want to override (yes/no)'
+        }
+      ], function (err, result) {
+        if (err) {
+          process.exit(0)
+        }
+        if (result.replaceConfig !== 'yes') {
+          process.exit(0)
+        } else {
+          startPrompt()
+        }
+      })
+    } else {
+      startPrompt()
+    }
+  })
+
+program
   .command('jobs')
   .description('List all completed jobs')
   .option('--completed', 'Show completed jobs')
   .option('--failed', 'Show failed jobs')
   .option('-l, --limit [limit]', 'Limit how many jobs to show')
   .action(function (options) {
-    createConfig()
+    openConfig()
 
     listJobs(queue, options.failed, options.completed, options.limit)
   })
@@ -103,7 +174,7 @@ program
   .command('ping [jobID]')
   .description('Attempt to ping webhook for job')
   .action(function (jobId, options) {
-    createConfig()
+    openConfig()
 
     var job = queue.getById(jobId)
 
@@ -118,7 +189,7 @@ program
 program
   .command('ping:retry-failed')
   .action(function() {
-    createConfig()
+    openConfig()
 
     var maxTries = configuration.queue.webhookMaxTries
     var retryStrategy = configuration.queue.webhookRetryStrategy
@@ -134,7 +205,7 @@ program
   .command('pings [jobId]')
   .description('List pings for a job')
   .action(function (jobId, options) {
-    createConfig()
+    openConfig()
 
     var job = queue.getById(jobId)
 
@@ -170,7 +241,7 @@ program
   .description('Push new job to the queue')
   .option('-m, --meta [meta]', 'JSON string with meta data. Default: \'{}\'')
   .action(function (url, options) {
-    createConfig()
+    openConfig()
 
     var response = queue.addToQueue({
       url: url,
@@ -187,7 +258,7 @@ program
   .command('shift')
   .description('Run the next job in the queue')
   .action(function (url) {
-    createConfig()
+    openConfig()
 
     var maxTries = configuration.queue.generationMaxTries
     var retryStrategy = configuration.queue.generationRetryStrategy
@@ -218,18 +289,36 @@ if (!process.argv.slice(2).length) {
   program.outputHelp();
 }
 
-function createConfig() {
+function openConfig() {
   configuration = defaultConfig
 
-  if (program.config) {
-    var configPath = path.join(process.cwd(), program.config)
-
-    if (!fs.existsSync(configPath)) {
-      throw new Error('No config file was found at ' + configPath)
+  if (!program.config) {
+    if (fs.existsSync(path.join(process.cwd(), 'pdf-bot.config.js'))) {
+      program.config = 'pdf-bot.config.js'
+    } else {
+      throw new Error('You need to supply a config file')
     }
+  }
 
-    debug('Creating CLI using config file %s', configPath)
-    merge(configuration, require(configPath))
+  var configPath = path.join(process.cwd(), program.config)
+
+  if (!fs.existsSync(configPath)) {
+    throw new Error('No config file was found at ' + configPath)
+  }
+
+  debug('Creating CLI using config file %s', configPath)
+  merge(configuration, require(configPath))
+
+  if (!fs.existsSync(configuration.storagePath)) {
+    throw new Error('Whoops! Looks like your storage folder does not exist. You should run pdf-bot install.')
+  }
+
+  if (!fs.existsSync(path.join(configuration.storagePath, 'db'))) {
+    throw new Error('There is no database folder in the storage folder. Create it: storage/db')
+  }
+
+  if (!fs.existsSync(path.join(configuration.storagePath, 'pdf'))) {
+    throw new Error('There is no pdf folder in the storage folder. Create it: storage/pdf')
   }
 
   var queueOptions = configuration.queue

@@ -16,14 +16,16 @@ Imagine you have an app that creates invoices. You want to save those invoices a
 
 ```bash
 $ npm install -g pdf-bot
-$ pdf-bot --help
+$ pdf-bot install
 ```
 
 > Make sure the node path is in your $PATH
 
+`pdf-bot install` will prompt for some basic configurations and then create a storage folder where your database and pdf files will be saved.
+
 ### Configuration
 
-`pdf-bot` comes packaged with sensible defaults. However, if you want to customize your config, simply create a config file that exports a configuration and pass it as a parameter to `pdf-bot`
+`pdf-bot` comes packaged with sensible defaults. At the very minimum you must have a config file in the same folder from which you are executing `pdf-bot` with a `storagePath` given.
 
 `pdf-bot.config.js`
 ```js
@@ -35,7 +37,8 @@ module.exports = {
   },
   generator: {
     completionTrigger: new htmlPdf.CompletionTrigger.Timer(1000) // 1 sec timeout
-  }
+  },
+  storagePath: 'storage'
 }
 ```
 
