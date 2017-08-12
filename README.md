@@ -1,4 +1,4 @@
-# pdf-bot
+# 🤖 pdf-bot
 
 Easily create a microservice for generating PDFs using headless Chrome.
 
