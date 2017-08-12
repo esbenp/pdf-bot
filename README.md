@@ -104,6 +104,14 @@ This will start an [express server](http://expressjs.com) that listens for new j
 
 `pdf-bot` uses [html-pdf-chrome](https://github.com/westy92/html-pdf-chrome) which in turns uses [chrome-launcher](https://github.com/GoogleChrome/lighthouse/tree/master/chrome-launcher) to launch chrome. You should check out those two resources on how to properly setup Chrome. However, with `chrome-launcher` Chrome should be started automatically. Otherwise, `html-pdf-chrome` has a small guide on how to have it running as a process using `pm2`.
 
+You can install chrome on Ubuntu using
+
+```
+sudo apt-get update && apt-get install chromium-browser
+```
+
+If you are testing things on OSX or similar, `chrome-launcher` should be able to find and automatically startup Chrome for you.
+
 #### Setting up the receiving API
 
 In the [examples folder](https://github.com/esbenp/pdf-bot/blob/master/examples/receiving-api.js) there is a small example on how the application API could look. Basically, you just have to define an endpoint that will receive the webhook and check that the signature matches.
@@ -412,6 +420,10 @@ DEBUG=pdf:* pdf-bot jobs
 ```bash
 $ npm run test
 ```
+
+## Issues
+
+[Please report issues to the issue tracker](https://github.com/esbenp/pdf-bot/issues/new)
 
 ## License
 
