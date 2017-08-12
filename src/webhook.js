@@ -2,6 +2,7 @@ var crypto = require('crypto')
 var debug = require('debug')('pdf:webhook')
 var fetch = require('node-fetch')
 var uuid = require('uuid')
+var error = require('./error')
 var utils = require('./utils')
 
 function ping (job, options) {
@@ -55,7 +56,7 @@ function ping (job, options) {
   function createResponse (response, error) {
     var status = response.status
 
-    var createResponseObject = function(response, body) {
+    return getContentBody(response).then(body => {
       return {
         id: requestId,
         status: response.status,
@@ -66,17 +67,7 @@ function ping (job, options) {
         sent_at: sent_at,
         error: !response.ok
       }
-    }
-
-    var emptyCodes = [204, 205]
-
-    return error || emptyCodes.indexOf(response.status) !== -1
-      ? new Promise(function (resolve) {
-        return resolve(createResponseObject(response, error ? response : {}))
-      })
-      : response.json().then(function (json) {
-        return createResponseObject(response, json)
-      })
+    })
   }
 
   return fetch(options.url, requestOptions)
@@ -95,4 +86,41 @@ module.exports = {
 
 function generateSignature (payload, key) {
   return crypto.createHmac('sha1', key).update(payload).digest('hex')
+}
+
+function getContentBody (response) {
+  return new Promise(function(resolve){
+    var emptyCodes = [204, 205]
+    if (emptyCodes.indexOf(response.status) !== -1) {
+      resolve({})
+    }
+
+    // Happens for instance on ECONNREFUSED
+    if (!(response instanceof fetch.Response)) {
+      resolve(response)
+    }
+
+    var contentType = response.headers.get('content-type');
+    if (contentType.indexOf('json') === -1) {
+      return response.text().then(resolve)
+    }
+
+    return response.text().then(text => {
+      if (!text) {
+        return resolve({});
+      }
+      try {
+        return resolve(JSON.parse(text))
+      } catch (e) {
+        return resolve(
+          Object.assign(
+            error.createErrorResponse(error.ERROR_INVALID_JSON_RESPONSE),
+            {
+              response: text
+            }
+          )
+        )
+      }
+    })
+  })
 }

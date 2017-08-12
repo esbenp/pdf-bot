@@ -253,7 +253,7 @@ function listJobs(queue, failed = false, limit) {
       job.id,
       job.url,
       JSON.stringify(job.meta),
-      job.generatorTries,
+      job.generations.length,
       formatDate(job.created_at),
       formatDate(job.completed_at)
     ])

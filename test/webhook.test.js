@@ -1,5 +1,6 @@
 var sinon = require('sinon')
 var proxyquire = require('proxyquire')
+var fetch = require('node-fetch')
 
 var job = {
   id: 1,
@@ -127,13 +128,12 @@ describe('webhook', function() {
   it('should return proper response on success', function (done) {
     fetchStub.returns(
       new Promise(function (resolve) {
-        resolve({
-          ok: true,
+        resolve(new fetch.Response(JSON.stringify('response'), {
           status: 200,
-          json: function () {
-            return new Promise((resolve) => resolve('response'))
+          headers: {
+            'content-type': 'application/json'
           }
-        })
+        }))
       })
     )
 
