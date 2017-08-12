@@ -1,3 +1,4 @@
+var path = require('path')
 var htmlPdf = require('html-pdf-chrome')
 var uuid = require('uuid')
 var debug = require('debug')('pdf:generator')
@@ -5,7 +6,7 @@ var error = require('./error')
 var uuid = require('uuid')
 var utils = require('./utils')
 
-function createPdfGenerator(options = {}, storagePlugins = {}) {
+function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
   return function createPdf (url, job) {
     debug('Creating PDF for url %s with options %s', url, JSON.stringify(options))
 
@@ -22,14 +23,14 @@ function createPdfGenerator(options = {}, storagePlugins = {}) {
     return htmlPdf
       .create(url, options)
       .then((pdf) => {
-        var path = 'storage/pdf/' + uuid() + '.pdf'
+        var pdfPath = path.join(storagePath, 'pdf', (uuid() + '.pdf'))
 
-        debug('Saving PDF to %s', path)
+        debug('Saving PDF to %s', pdfPath)
 
-        pdf.toFile(path)
+        pdf.toFile(pdfPath)
 
         var storage = {
-          local: path
+          local: pdfPath
         }
         var storagePluginPromises = []
         for (var i in storagePlugins) {

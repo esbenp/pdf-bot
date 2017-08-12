@@ -21,6 +21,7 @@ module.exports = {
       secretAccessKey: ''
     })*/
   },
+  // storagePath: '',
   webhook: {
     headerNamespace: 'X-PDF-',
     requestOptions: {

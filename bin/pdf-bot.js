@@ -12,6 +12,7 @@ var error = require('../src/error')
 var createQueue = require('../src/queue')
 var webhook = require('../src/webhook')
 var pjson = require('../package.json')
+var appRoot = require('app-root-path')
 
 program
   .version(pjson.version)
@@ -44,7 +45,6 @@ var defaultConfig = {
       return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
     },
     webhookMaxTries: 5,
-    path: 'storage/db/db.json',
     lowDbOptions: {
 
     }
@@ -59,6 +59,7 @@ var defaultConfig = {
     })
     */
   },
+  storagePath: path.join(appRoot.toString(), 'storage'),
   /*webhook: {
     headerNamespace: 'X-PDF-',
     requestOptions: {
@@ -196,7 +197,8 @@ program
     if (next) {
       var generatorOptions = configuration.generator
       var storagePlugins = configuration.storage
-      var generator = createPdfGenerator(generatorOptions, storagePlugins)
+
+      var generator = createPdfGenerator(configuration.storagePath, generatorOptions, storagePlugins)
 
       queue.processJob(generator, next, configuration.webhook).then(response => {
         if (error.isError(response)) {
@@ -231,8 +233,7 @@ function createConfig() {
   }
 
   var queueOptions = configuration.queue
-  var dbPath = queueOptions.path
-  queue = createQueue(path.join(process.cwd(), dbPath), queueOptions.lowDbOptions)
+  queue = createQueue(path.join(configuration.storagePath, 'db/db.json'), queueOptions.lowDbOptions)
 }
 
 function listJobs(queue, failed = false, limit) {
