@@ -127,11 +127,11 @@ describe('webhook', function() {
   it('should return proper response on success', function (done) {
     fetchStub.returns(
       new Promise(function (resolve) {
-        return resolve({
+        resolve({
           ok: true,
           status: 200,
           json: function () {
-            return 'response'
+            return new Promise((resolve) => resolve('response'))
           }
         })
       })

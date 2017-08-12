@@ -2,10 +2,22 @@ var htmlPdf = require('html-pdf-chrome')
 var uuid = require('uuid')
 var debug = require('debug')('pdf:generator')
 var error = require('./error')
+var uuid = require('uuid')
+var utils = require('./utils')
 
 function createPdfGenerator(options = {}, storagePlugins = {}) {
   return function createPdf (url, job) {
     debug('Creating PDF for url %s with options %s', url, JSON.stringify(options))
+
+    var generationId = uuid()
+    var generated_at = utils.getCurrentDateTimeAsString()
+
+    function createResponseObject() {
+      return {
+        id: generationId,
+        generated_at: generated_at
+      }
+    }
 
     return htmlPdf
       .create(url, options)
@@ -47,9 +59,12 @@ function createPdfGenerator(options = {}, storagePlugins = {}) {
             }
           }
 
-          return {
-            storage: storage
-          }
+          return Object.assign(
+            createResponseObject(),
+            {
+              storage: storage
+            }
+          )
         })
       })
       .catch(msg => {
@@ -57,7 +72,7 @@ function createPdfGenerator(options = {}, storagePlugins = {}) {
 
         response.message += ' ' + msg
 
-        return response
+        return Object.assign(createResponseObject(), response)
       })
   }
 }

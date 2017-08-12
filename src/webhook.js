@@ -52,23 +52,40 @@ function ping (job, options) {
 
   var sent_at = utils.getCurrentDateTimeAsString()
 
-  return fetch(options.url, requestOptions).then(function(response) {
-    var emptyCodes = [204, 205]
+  function createResponse (response, error) {
+    var status = response.status
 
-    return Object.assign(
-      {
+    var createResponseObject = function(response, body) {
+      return {
         id: requestId,
         status: response.status,
         method: requestOptions.method,
         payload: bodyRaw,
+        response: body,
         url: options.url,
-        sent_at: sent_at
-      },
-      response.ok
-        ? {response: emptyCodes.indexOf(response.status) !== -1 ? {} : response.json()}
-        : {error: true}
-    )
-  })
+        sent_at: sent_at,
+        error: !response.ok
+      }
+    }
+
+    var emptyCodes = [204, 205]
+
+    return error || emptyCodes.indexOf(response.status) !== -1
+      ? new Promise(function (resolve) {
+        return resolve(createResponseObject(response, error ? response : {}))
+      })
+      : response.json().then(function (json) {
+        return createResponseObject(response, json)
+      })
+  }
+
+  return fetch(options.url, requestOptions)
+    .then(function (response) {
+      return createResponse(response, !response.ok)
+    })
+    .catch(function (response) {
+      return createResponse(response, true)
+    })
 }
 
 module.exports = {

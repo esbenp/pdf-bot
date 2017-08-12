@@ -19,7 +19,7 @@
   "scripts": {
     "example": "DEBUG=pdf:* node ./bin/pdf-bot.js --config ./examples/pdf-bot.config.js",
     "example:receiving-api": "DEBUG=pdf:* node ./examples/receiving-api.js",
-    "test": "mocha test/*.test.js --check-leaks --recursive",
+    "test": "mocha test/*.test.js --recursive",
     "test:watch": "mocha -w test/*.test.js --recursive"
   },
   "dependencies": {
@@ -30,6 +30,7 @@
     "debug": "^2.6.8",
     "express": "^4.15.3",
     "html-pdf-chrome": "^0.2.0",
+    "lodash.merge": "^4.6.0",
     "lowdb": "^0.16.2",
     "node-fetch": "^1.7.1",
     "s3": "^4.4.0",

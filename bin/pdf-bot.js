@@ -5,6 +5,7 @@ var path = require('path')
 var debug = require('debug')('pdf:cli')
 var Table = require('cli-table')
 var program = require('commander');
+var merge = require('lodash.merge')
 var createPdfGenerator = require('../src/pdfGenerator')
 var createApi = require('../src/api')
 var error = require('../src/error')
@@ -16,7 +17,57 @@ program
   .version(pjson.version)
   .option('-c, --config <path>', 'Path to configuration file')
 
+var decaySchedule = [
+  1000 * 60, // 1 minute
+  1000 * 60 * 3, // 3 minutes
+  1000 * 60 * 10, // 10 minutes
+  1000 * 60 * 30, // 30 minutes
+  1000 * 60 * 60 // 1 hour
+];
+
 var configuration, queue
+var defaultConfig = {
+  api: {
+    port: 3000,
+    //token: 'api-token'
+  },
+  // html-pdf-chrome options
+  generator: {
+
+  },
+  queue: {
+    generationRetryStrategy: function(job, retries) {
+      return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
+    },
+    generationMaxTries: 5,
+    webhookRetryStrategy: function(job, retries) {
+      return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
+    },
+    webhookMaxTries: 5,
+    path: 'storage/db/db.json',
+    lowDbOptions: {
+
+    }
+  },
+  storage: {
+    /*
+    's3': createS3Config({
+      bucket: '',
+      accessKeyId: '',
+      region: '',
+      secretAccessKey: ''
+    })
+    */
+  },
+  /*webhook: {
+    headerNamespace: 'X-PDF-',
+    requestOptions: {
+
+    },
+    secret: '12345',
+    url: 'http://localhost:3001/hook'
+  }*/
+}
 
 program
   .command('api')
@@ -24,8 +75,8 @@ program
   .action(function (options) {
     createConfig()
 
-    var apiOptions = configuration.api || {}
-    var port = apiOptions.port || 3000
+    var apiOptions = configuration.api
+    var port = apiOptions.port
 
     createApi(queue, {
       port: port,
@@ -36,24 +87,15 @@ program
   })
 
 program
-  .command('failed')
-  .description('List all failed jobs')
-  .option('-l, --limit [limit]', 'Limit how many jobs to show')
-  .action(function (options) {
-    createConfig()
-
-    listJobs(queue, true, false, options.limit)
-  })
-
-program
   .command('jobs')
   .description('List all completed jobs')
+  .option('--completed', 'Show completed jobs')
+  .option('--failed', 'Show failed jobs')
   .option('-l, --limit [limit]', 'Limit how many jobs to show')
-  .option('-n, --new', 'Show jobs that have yet to be run')
   .action(function (options) {
     createConfig()
 
-    listJobs(queue, false, options.new, options.limit)
+    listJobs(queue, options.failed, options.completed, options.limit)
   })
 
 program
@@ -69,12 +111,22 @@ program
       return;
     }
 
-    queue.attemptPing(job, configuration.webhook || {}).then(response => {
-      var message = response.error ? 'Ping failed: ' : 'Ping succeeded: '
-      console.log(message + JSON.stringify(response))
+    ping(job, configuration.webhook)
+  })
 
-      return response
-    })
+program
+  .command('ping:retry-failed')
+  .action(function() {
+    createConfig()
+
+    var maxTries = configuration.queue.webhookMaxTries
+    var retryStrategy = configuration.queue.webhookRetryStrategy
+
+    var next = queue.getNextWithoutSuccessfulPing(retryStrategy, maxTries)
+
+    if (next) {
+      ping(next, configuration.webhook)
+    }
   })
 
 program
@@ -133,44 +185,53 @@ program
 program
   .command('shift')
   .description('Run the next job in the queue')
-  .action(function (url, options) {
+  .action(function (url) {
     createConfig()
 
-    var next = queue.getNext()
+    var maxTries = configuration.queue.generationMaxTries
+    var retryStrategy = configuration.queue.generationRetryStrategy
 
-    if (!next) {
-      console.log('No more jobs to run.')
-      process.exit(0)
+    var next = queue.getNext(retryStrategy, maxTries)
+
+    if (next) {
+      var generatorOptions = configuration.generator
+      var storagePlugins = configuration.storage
+      var generator = createPdfGenerator(generatorOptions, storagePlugins)
+
+      queue.processJob(generator, next, configuration.webhook).then(response => {
+        if (error.isError(response)) {
+          console.error(response.message)
+          process.exit(1)
+        } else {
+          console.log('Job ID ' + next.id + ' was processed.')
+          process.exit(0)
+        }
+      })
     }
-
-    var generatorOptions = configuration.generator || {}
-    var storagePlugins = configuration.storage || {}
-    var generator = createPdfGenerator(generatorOptions, storagePlugins)
-
-    queue.processJob(generator, next, configuration.webhook || {}).then(response => {
-      if (error.isError(response)) {
-        console.error(response.message)
-        process.exit(1)
-      } else {
-        process.exit(0)
-      }
-    })
   })
 
 program.parse(process.argv)
 
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
+}
+
 function createConfig() {
-  var configPath = path.join(process.cwd(), program.config)
+  configuration = defaultConfig
 
-  debug('Creating CLI using config file %s', configPath)
+  if (program.config) {
+    var configPath = path.join(process.cwd(), program.config)
 
-  if (!program.config || !fs.existsSync(configPath)) {
-    throw new Error('Invalid config file given.')
+    if (!fs.existsSync(configPath)) {
+      throw new Error('No config file was found at ' + configPath)
+    }
+
+    debug('Creating CLI using config file %s', configPath)
+    merge(configuration, require(configPath))
   }
 
-  configuration = require(configPath)
-  var queueOptions = configuration.queue || {}
-  var dbPath = queueOptions.path || 'storage/db/db.json'
+  var queueOptions = configuration.queue
+  var dbPath = queueOptions.path
   queue = createQueue(path.join(process.cwd(), dbPath), queueOptions.lowDbOptions)
 }
 
@@ -199,6 +260,18 @@ function listJobs(queue, failed = false, limit) {
   }
 
   console.log(table.toString());
+}
+
+function ping(job, webhookConfiguration) {
+  queue.attemptPing(job, webhookConfiguration || {}).then(response => {
+    if (!response.error) {
+      console.log('Ping succeeded: ' + JSON.stringify(response))
+    } else {
+      console.error('Ping failed: ' + JSON.stringify(response))
+    }
+
+    return response
+  })
 }
 
 function formatDate(input) {

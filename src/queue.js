@@ -26,6 +26,7 @@ function createQueue (path, options = {}, initialValue = []) {
     getById: createQueueMethod(getById),
     getList: createQueueMethod(getList),
     getNext: createQueueMethod(getNext),
+    getNextWithoutSuccessfulPing: createQueueMethod(getNextWithoutSuccessfulPing),
     processJob: createQueueMethod(processJob)
   }
 }
@@ -50,9 +51,8 @@ function addToQueue (db, data) {
     id: id,
     created_at: createdAt,
     completed_at: null,
-    generatorTries: 0,
+    generations: [],
     pings: [],
-    pingTries: 0,
     storage: {}
   })
 
@@ -70,20 +70,22 @@ function addToQueue (db, data) {
 // RETRIEVAL
 // =========
 
-function getList (db, failed = false, pristine = false, limit) {
+function getList (db, failed = false, completed = false, limit) {
   var query = db.get('queue')
 
-  if (failed) {
-    // Show failed jobs
-    query = query.filter(function (job) {
-      return job.completed_at === null && job.generatorTries > -1
-    })
-  } else {
-    // Show completed and optionally new jobs
-    query = query.filter(function (job) {
-      return job.completed_at !== null || (pristine === true && job.generatorTries === -1)
-    })
-  }
+  query = query.filter(function (job) {
+    // failed jobs
+    if (!failed && job.completed_at === null && job.generations.length > 0) {
+      return false
+    }
+
+    // completed jobs
+    if (!completed && job.completed_at !== null) {
+      return false
+    }
+
+    return true
+  })
 
   if (limit) {
     query = query.take(limit)
@@ -99,11 +101,65 @@ function getById (db, id) {
     .value()
 }
 
-function getNext (db) {
+function getNext (db, shouldWait, maxTries = 5) {
   return db
     .get('queue')
     .filter(function (job) {
-      return job.completed_at === null && job.generatorTries < 3
+      if (job.completed_at !== null) {
+        return false
+      }
+
+      var currentTries = job.generations.length
+
+      if (currentTries === 0) {
+        return true
+      }
+
+      if (currentTries < maxTries) {
+        var lastRun = job.generations[currentTries - 1].generated_at
+
+        if (_hasWaitedLongEnough(lastRun, shouldWait(job, currentTries))) {
+          return true
+        }
+      }
+
+      return false
+    })
+    .take(1)
+    .value()[0]
+}
+
+function getNextWithoutSuccessfulPing (db, shouldWait, maxTries = 5) {
+  return db
+    .get('queue')
+    .filter(function (job) {
+      var currentTries = job.pings.length
+
+      if (job.completed_at === null) {
+        return false
+      }
+
+      if (currentTries === 0) {
+        return true
+      }
+
+      if (currentTries >= maxTries) {
+        return false
+      }
+
+      var unsuccessfulPings = job.pings.filter(ping => ping.error)
+
+      // There are some successful ping(s)
+      if (unsuccessfulPings.length !== job.pings.length) {
+        return false
+      }
+
+      var lastTry = unsuccessfulPings[unsuccessfulPings.length - 1].sent_at
+      if (_hasWaitedLongEnough(lastTry, shouldWait(job, currentTries))) {
+        return true
+      }
+
+      return false
     })
     .take(1)
     .value()[0]
@@ -116,10 +172,11 @@ function getNext (db) {
 function processJob (db, generator, job, webhookOptions) {
   return generator(job.url, job)
     .then(response => {
+      _logGeneration(db, job.id, response)
+
       if (!error.isError(response)) {
         debug('Job %s was processed, marking job as complete.', job.id)
 
-        _bumpGeneratorTries(db, job.id)
         _markAsCompleted(db, job.id)
         _setStorage(db, job.id, response.storage)
 
@@ -130,8 +187,6 @@ function processJob (db, generator, job, webhookOptions) {
               return response
             })
         }
-      } else {
-        _bumpGeneratorTries(db, job.id)
       }
 
       return response
@@ -147,57 +202,45 @@ function attemptPing (db, job, webhookOptions) {
     throw new Error('No webhook is configured.')
   }
 
-  return webhook.ping(job, webhookOptions).then(response => {
-    _bumpPingTries(db, job.id)
-    _logPing(db, job.id, response)
+  return webhook.ping(job, webhookOptions)
+    .then(response => {
+      _logPing(db, job.id, response)
 
-    return response
-  })
+      return response
+    })
 }
 
 // ===============
 // PRIVATE METHODS
 // ===============
 
-function _setStorage (db, id, storage) {
-  return db
-    .get('queue')
-    .find({ id: id })
-    .assign({ storage: storage })
-    .write()
+function _hasWaitedLongEnough (logTimestamp, timeToWait) {
+  var diff = (new Date() - new Date(logTimestamp))
+  return diff > timeToWait
 }
 
-function _bumpGeneratorTries (db, id) {
-  debug('Bumping tries for job ID %s', id)
+function _logGeneration (db, id, response) {
+  debug('Logging try for job ID %s', id)
 
   var job = getById(db, id)
 
-  return db
-    .get('queue')
-    .find({ id: id })
-    .assign({ generatorTries: (job.generatorTries + 1) })
-    .write()
-}
-
-function _bumpPingTries (db, id) {
-  debug('Bumping ping tries for job ID %s', id)
-
-  var job = getById(db, id)
+  var generations = job.generations.slice(0)
+  generations.push(response)
 
   return db
     .get('queue')
     .find({ id: id })
-    .assign({ pingTries: (job.pingTries + 1) })
+    .assign({ generations: generations })
     .write()
 }
 
-function _logPing (db, id, data) {
+function _logPing (db, id, response) {
   debug('Logging ping for job ID %s', id)
 
   var job = getById(db, id)
 
   var pings = job.pings.slice(0)
-  pings.push(data)
+  pings.push(response)
 
   return db
     .get('queue')
@@ -215,6 +258,14 @@ function _markAsCompleted (db, id) {
     .get('queue')
     .find({ id: id })
     .assign({ completed_at: completed_at })
+    .write()
+}
+
+function _setStorage (db, id, storage) {
+  return db
+    .get('queue')
+    .find({ id: id })
+    .assign({ storage: storage })
     .write()
 }
 

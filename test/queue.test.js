@@ -25,14 +25,23 @@ function createQueue() {
 }
 
 var i = 0
-function createJob(completed = false, tries = 0) {
+function createJob(completed = false, generationTries = 0, pingTries = 0) {
   i++
+
+  var generations = []
+  for(var k = 0; k < generationTries; k++) {
+    generations.push({ id: 'xxx' })
+  }
+  var pings = []
+  for(var k = 0; k < pingTries; k++) {
+    pings.push({ id: 'xxx' })
+  }
+
   return {
     id: i,
     completed_at: (completed ? '2017-01-01' : null),
-    generatorTries: completed ? 1 : tries,
-    pings: [],
-    pingTries: 0
+    generations: generations,
+    pings: pings
   }
 }
 
@@ -41,6 +50,10 @@ describe('queue : retrieval', function() {
   beforeEach(function() {
     i = 0
     queue = createQueue()
+  })
+
+  afterEach(function(){
+    deleteQueue()
   })
 
   it('should create a default structure', function() {
@@ -85,12 +98,12 @@ describe('queue : retrieval', function() {
     queue = createQueue({}, [
       createJob(false, 2),
       createJob(true, 1),
-      createJob(false, -1) // has not been run yet
+      createJob(false, 0) // has not been run yet
     ])
 
     var list = queue.getList(true)
 
-    assert.equal(list.length, 1)
+    assert.equal(list.length, 2)
     assert.equal(list[0].id, 1)
   })
 
@@ -98,10 +111,10 @@ describe('queue : retrieval', function() {
     queue = createQueue({}, [
       createJob(true),
       createJob(true),
-      createJob(false)
+      createJob(false, 1)
     ])
 
-    var list = queue.getList(false, false)
+    var list = queue.getList(false, true)
 
     assert.equal(list.length, 2)
     assert.equal(list[1].id, 2)
@@ -112,19 +125,19 @@ describe('queue : retrieval', function() {
       createJob(true),
       createJob(true),
       createJob(false, 1), // failed
-      createJob(false, -1) // new
+      createJob(false, 0) // new
     ])
 
-    var list = queue.getList(false, true)
+    var list = queue.getList(false, false)
 
-    assert.equal(list.length, 3)
-    assert.equal(list[2].id, 4)
+    assert.equal(list.length, 1)
+    assert.equal(list[0].id, 4)
   })
 
   it('should limit', function() {
     var jobs = []
     for(var i = 0; i <= 20; i++) {
-      jobs.push(createJob(true))
+      jobs.push(createJob(false))
     }
 
     queue = createQueue({}, jobs)
@@ -146,16 +159,78 @@ describe('queue : retrieval', function() {
     assert.equal(job.meta.correct, true)
   })
 
-  it('should return the next job in queue', function() {
+  it('should return the next job if no tries were found', function() {
     queue = createQueue({}, [
       createJob(true),
-      createJob(false, 3),
-      createJob(false, 2),
+      createJob(false, 5),
       createJob(false),
       createJob(true)
     ])
 
-    var job = queue.getNext()
+    var job = queue.getNext(function(){}, 5)
+
+    assert.equal(job.id, 3)
+  })
+
+  it('should return the next job that is within decay schedule', function() {
+    var dateOne = inFiveMinutes()
+    var dateTwo = fiveMinutesAgo()
+
+    var jobWithManyGenerations = []
+    for(var k = 0; k < 10; k++) {
+      jobWithManyGenerations.push({ id: k, generated_at: dateTwo })
+    }
+
+    queue = createQueue({}, [
+      createJob(true),
+      Object.assign(createJob(false), { generations: jobWithManyGenerations }), // should skip this due to generations
+      Object.assign(createJob(false), { generations: [{id: 1, generated_at: dateOne }] }), // should skip due to decay
+      Object.assign(createJob(false), { generations: [{id: 1, generated_at: dateTwo }] })
+    ])
+
+    var job = queue.getNext(function(){ return 1000 * 60 * 4 }, 5)
+
+    assert.equal(job.id, 4)
+  })
+
+  it('should get next with no pings', function() {
+    var jobWithManyPings = []
+    for(var k = 0; k < 10; k++) {
+      jobWithManyPings.push({ id: k, sent_at: fiveMinutesAgo(), error: true })
+    }
+
+    queue = createQueue({}, [
+      Object.assign(createJob(true, 1, 5), {pings: jobWithManyPings}), // exceeds limit
+      createJob(false, 1, 0), // should skip since it is not completed
+      Object.assign(createJob(true, 1), {pings: [{id:55, sent_at: fiveMinutesAgo(), error: true }]})
+    ])
+
+    var job = queue.getNextWithoutSuccessfulPing(function(){ return 1000 * 60 * 4 }, 5)
+
+    assert.equal(job.id, 3)
+  })
+
+  it('should get next ping that is within decay schedule', function() {
+    var dateOne = fiveMinutesAgo()
+    var dateTwo = inFiveMinutes()
+
+    var jobWithManyPings = []
+    for(var k = 0; k < 10; k++) {
+      jobWithManyPings.push({ id: k, sent_at: dateTwo, error: true })
+    }
+
+    queue = createQueue({}, [
+      // not within decay
+      Object.assign(createJob(true), { pings: [{ id: 1, error: true, sent_at: dateTwo }, { id: 2, error: true, sent_at: dateTwo }] }),
+      // too many pings
+      Object.assign(createJob(true), { pings: jobWithManyPings }),
+      // next
+      Object.assign(createJob(true), { pings: [{ id: 4, error: true, sent_at: dateOne }] }),
+      // after previous
+      Object.assign(createJob(true), { pings: [{ id: 5, error: true, sent_at: dateOne }] })
+    ])
+
+    var job = queue.getNextWithoutSuccessfulPing(function() { return 1000 * 60 * 4 }, 5)
 
     assert.equal(job.id, 3)
   })
@@ -167,22 +242,36 @@ describe('queue : processing', function() {
     queue = createQueue()
   })
 
-  it('should bump tries on eror', function(done) {
+  afterEach(function(){
+    deleteQueue()
+  })
+
+  it('should log generation', function(done) {
     var job = createJob(false)
-    var generator = sinon.stub().returns(new Promise(resolve => resolve({
+    var errorGenerator = sinon.stub().returns(new Promise(resolve => resolve({
       code: '001',
       error: true
+    })))
+    var successGenerator = sinon.stub().returns(new Promise(resolve => resolve({
+      success: true
     })))
     queue = createQueue({}, [
       job
     ])
 
-    queue.processJob(generator, job).then(response => {
-      assert(error.isError(response))
+    Promise.all([
+      queue.processJob(errorGenerator, job),
+      queue.processJob(successGenerator, job)
+    ]).then(function(responses) {
+      assert(error.isError(responses[0]))
+      assert(!error.isError(responses[1]))
 
       var dbJob = getQueue()[0]
 
-      assert.equal(dbJob.generatorTries, 1)
+      assert.equal(dbJob.generations.length, 2)
+      assert.equal(dbJob.generations[0].code, '001')
+      assert.equal(dbJob.generations[1].success, true)
+
       done()
     })
   })
@@ -207,7 +296,6 @@ describe('queue : processing', function() {
 
       var dbJob = getQueue()[0]
 
-      assert.equal(dbJob.generatorTries, 1)
       assert(dbJob.completed_at !== null)
       assert(dbJob.storage.local, 'awesome')
       assert(response.completed, true)
@@ -226,6 +314,10 @@ describe('queue : pinging', function() {
   beforeEach(function(){
     i = 0
     queue = createQueue()
+  })
+
+  afterEach(function(){
+    deleteQueue()
   })
 
   it('should throw error if no webhook is configured', function() {
@@ -260,7 +352,6 @@ describe('queue : pinging', function() {
       dbJob = getQueue()[0]
 
       assert.equal(dbJob.pings.length, 1)
-      assert.equal(dbJob.pingTries, 1)
 
       var ping = dbJob.pings[0]
 
@@ -271,3 +362,15 @@ describe('queue : pinging', function() {
     })
   })
 })
+
+function inFiveMinutes() {
+  var dateOne = new Date()
+  dateOne.setTime(dateOne.getTime() + (1000 * 60 * 5)) // add 5 minutes
+  return dateOne.toUTCString()
+}
+
+function fiveMinutesAgo() {
+  var dateOne = new Date()
+  dateOne.setTime(dateOne.getTime() - (1000 * 60 * 5)) // add 5 minutes
+  return dateOne.toUTCString()
+}
