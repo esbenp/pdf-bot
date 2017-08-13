@@ -172,27 +172,27 @@ function purge (db, failed = false, pristine = false, maxTries = 5) {
   query = query.filter(function (job) {
     // failed jobs
     if (failed && job.completed_at === null && job.generations.length >= maxTries) {
-      return false
+      return true
     }
 
     // new jobs
     if (pristine && job.completed_at === null && job.generations.length < maxTries) {
-      return false
+      return true
     }
 
     // completed jobs
     if (job.completed_at !== null) {
-      return false
+      return true
     }
 
-    return true
+    return false
   })
 
   var queue = query.value()
 
-  return db
-    .assign({ queue: queue })
-    .write()
+  for(var i in queue) {
+    db.get('queue').remove({ id: queue[i].id }).write()
+  }
 }
 
 // ==========
