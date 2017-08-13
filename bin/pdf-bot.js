@@ -75,12 +75,15 @@ program
   .command('api')
   .description('Start the API')
   .action(function (options) {
-    openConfig()
+    // We delay initiation of queue. This is because the API will load the DB in memory as
+    // copy A. When we make changes through the CLI this creates copy B. But next time the
+    // user pushes to the queue using the API copy A will be persisted again.
+    var initiateQueue = openConfig(true)
 
     var apiOptions = configuration.api
     var port = apiOptions.port
 
-    createApi(queue, {
+    createApi(initiateQueue, {
       port: port,
       token: apiOptions.token
     }).listen(port, function() {
@@ -322,7 +325,7 @@ function processJob(job, configuration) {
   })
 }
 
-function openConfig() {
+function openConfig(delayQueueCreation = false) {
   configuration = defaultConfig
 
   if (!program.config) {
@@ -354,8 +357,16 @@ function openConfig() {
     throw new Error('There is no pdf folder in the storage folder. Create it: storage/pdf')
   }
 
-  var queueOptions = configuration.queue
-  queue = createQueue(path.join(configuration.storagePath, 'db/db.json'), queueOptions.lowDbOptions)
+  function initiateQueue() {
+    var queueOptions = configuration.queue
+    return createQueue(path.join(configuration.storagePath, 'db/db.json'), queueOptions.lowDbOptions)
+  }
+
+  if (delayQueueCreation) {
+    return initiateQueue
+  } else {
+    queue = initiateQueue()
+  }
 }
 
 function listJobs(queue, failed = false, limit) {

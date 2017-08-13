@@ -4,12 +4,9 @@ var createApi = require('../src/api')
 var error = require('../src/error')
 
 describe('api: POST /', function () {
-  var api, queue
-  beforeEach(function() {
-    queue = {
-      addToQueue: sinon.spy()
-    }
-    api = createApi(queue, {
+  var api
+  beforeEach(function(){
+    api = createApi(function(){}, {
       token: '1234'
     })
   })
@@ -28,15 +25,17 @@ describe('api: POST /', function () {
   })
 
   it('should return 422 on errorneous responses', function(done) {
-    queue = {
-      addToQueue: function() {
-        return {
-          code: '001',
-          error: true
+    queue = function () {
+      return {
+        addToQueue: function() {
+          return {
+            code: '001',
+            error: true
+          }
         }
       }
     }
-    api = createApi(queue, {
+    var api = createApi(queue, {
       token: '1234'
     })
 
@@ -50,8 +49,17 @@ describe('api: POST /', function () {
   it('should run the queue with the correct params', function (done) {
     var meta = {id: 1}
 
-    queue.addToQueue = sinon.stub()
-    queue.addToQueue.onCall(0).returns({ id: '1234' })
+    var addToQueue = sinon.stub()
+    addToQueue.onCall(0).returns({ id: '1234' })
+
+    var queue = function() {
+      return {
+        addToQueue: addToQueue
+      }
+    }
+    var api = createApi(queue, {
+      token: '1234'
+    })
 
     request(api)
       .post('/')
@@ -61,7 +69,7 @@ describe('api: POST /', function () {
       .end(function (err, res) {
         if (err) return done(err)
 
-        if (!queue.addToQueue.calledWith({ url: 'https://google.com', meta: meta })) {
+        if (!addToQueue.calledWith({ url: 'https://google.com', meta: meta })) {
           throw new Error('Queue was not called with correct url')
         }
 

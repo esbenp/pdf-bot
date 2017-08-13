@@ -4,7 +4,7 @@ var bodyParser = require('body-parser')
 var debug = require('debug')('pdf:api')
 var error = require('./error')
 
-function createApi(queue, options = {}) {
+function createApi(createQueue, options = {}) {
   var api = express()
   api.use(bodyParser.json())
 
@@ -15,6 +15,7 @@ function createApi(queue, options = {}) {
   }
 
   api.post('/', function(req, res) {
+    var queue = createQueue()
     var authHeader = req.get('Authorization')
 
     if (token && (!authHeader || authHeader.replace(/Bearer (.*)$/i, '$1') !== token)) {
