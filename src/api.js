@@ -17,7 +17,7 @@ function createApi(queue, options = {}) {
   api.post('/', function(req, res) {
     var authHeader = req.get('Authorization')
 
-    if (token && (!authHeader || authHeader.replace(/Bearer (.*)$/, '$1') !== token)) {
+    if (token && (!authHeader || authHeader.replace(/Bearer (.*)$/i, '$1') !== token)) {
       res.status(401).json(error.createErrorResponse(error.ERROR_INVALID_TOKEN))
       return
     }
