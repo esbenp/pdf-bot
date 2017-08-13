@@ -159,6 +159,22 @@ program
   })
 
 program
+  .command('generate [jobID]')
+  .description('Generate PDF for job')
+  .action(function (jobId, options){
+    openConfig()
+
+    var job = queue.getById(jobId)
+
+    if (!job) {
+      console.log('Job not found')
+      return;
+    }
+
+    processJob(job, configuration)
+  })
+
+program
   .command('jobs')
   .description('List all completed jobs')
   .option('--completed', 'Show completed jobs')
@@ -266,20 +282,7 @@ program
     var next = queue.getNext(retryStrategy, maxTries)
 
     if (next) {
-      var generatorOptions = configuration.generator
-      var storagePlugins = configuration.storage
-
-      var generator = createPdfGenerator(configuration.storagePath, generatorOptions, storagePlugins)
-
-      queue.processJob(generator, next, configuration.webhook).then(response => {
-        if (error.isError(response)) {
-          console.error(response.message)
-          process.exit(1)
-        } else {
-          console.log('Job ID ' + next.id + ' was processed.')
-          process.exit(0)
-        }
-      })
+      processJob(next, configuration)
     }
   })
 
@@ -287,6 +290,23 @@ program.parse(process.argv)
 
 if (!process.argv.slice(2).length) {
   program.outputHelp();
+}
+
+function processJob(job, configuration) {
+  var generatorOptions = configuration.generator
+  var storagePlugins = configuration.storage
+
+  var generator = createPdfGenerator(configuration.storagePath, generatorOptions, storagePlugins)
+
+  queue.processJob(generator, job, configuration.webhook).then(response => {
+    if (error.isError(response)) {
+      console.error(response.message)
+      process.exit(1)
+    } else {
+      console.log('Job ID ' + job.id + ' was processed.')
+      process.exit(0)
+    }
+  })
 }
 
 function openConfig() {

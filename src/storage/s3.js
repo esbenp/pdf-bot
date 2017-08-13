@@ -1,5 +1,6 @@
 var debug = require('debug')('pdf:s3')
 var s3 = require('s3')
+var path = require('path')
 
 function createS3Storage(options = {}) {
   if (!options.accessKeyId) {
@@ -39,8 +40,7 @@ function createS3Storage(options = {}) {
 
       var pathSplitted = localPath.split('/')
       var fileName = pathSplitted[pathSplitted.length - 1]
-
-      var fullRemotePath = remotePath.split('/').concat([fileName]).join('/')
+      var fullRemotePath = path.join(remotePath, fileName)
 
       var uploadOptions = {
         localFile: localPath,

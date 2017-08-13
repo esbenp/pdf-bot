@@ -290,7 +290,7 @@ Currently `pdf-bot` comes bundled with build-in support for storing PDFs on Amaz
 To install S3 storage add a key to the `storage` configuration. Notice, you can add as many different locations you want by giving them different keys.
 
 ```javascript
-var createS3Config = require('pdf-bot/storage/s3')
+var createS3Config = require('pdf-bot/src/storage/s3')
 
 module.exports = {
   api: {

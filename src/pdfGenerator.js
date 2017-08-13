@@ -47,7 +47,7 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
               })(i)
 
               storagePluginPromises.push(
-                storagePlugins[i](path, job).then(then)
+                storagePlugins[i](pdfPath, job).then(then)
               )
             }
 
