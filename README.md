@@ -141,6 +141,10 @@ api.post('/hook', function (req, res) {
 })
 ```
 
+### Setup production environment
+
+[Follow the guide under `production/` to see how to setup `pdf-bot` using `pm2` and `nginx`](https://github.com/esbenp/pdf-bot/blob/master/production/README.md)
+
 ### Setup crontab
 
 We setup our crontab to continously look for jobs that have not yet been completed.
