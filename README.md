@@ -1,6 +1,6 @@
 # 🤖 pdf-bot
 
-[![npm](https://img.shields.io/npm/v/pdf-bot.svg)](https://www.npmjs.com/package/pdf-bot) [![Build Status](https://travis-ci.org/esbenp/pdf-bot.svg?branch=master)](https://travis-ci.org/esbenp/pdf-bot) [![Coverage Status](https://coveralls.io/repos/esbenp/pdf-bot/badge.svg?branch=master&service=github)](https://coveralls.io/github/esbenp/pdf-bot?branch=master)
+[![npm](https://img.shields.io/npm/v/pdf-bot.svg)](https://www.npmjs.com/package/pdf-bot) [![Build Status](https://travis-ci.org/esbenp/pdf-bot.svg?branch=master)](https://travis-ci.org/esbenp/pdf-bot) [![Coverage Status](https://coveralls.io/repos/github/esbenp/pdf-bot/badge.svg?branch=master)](https://coveralls.io/github/esbenp/pdf-bot?branch=master)
 
 Easily create a microservice for generating PDFs using headless Chrome.
 
