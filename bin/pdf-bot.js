@@ -82,7 +82,7 @@ program
 
     createApi(queue, {
       port: port,
-      token: options.token
+      token: apiOptions.token
     }).listen(port, function() {
       debug('Listening to port %d', port)
     })
