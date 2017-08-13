@@ -27,46 +27,48 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
 
         debug('Saving PDF to %s', pdfPath)
 
-        pdf.toFile(pdfPath)
-
-        var storage = {
-          local: pdfPath
-        }
-        var storagePluginPromises = []
-        for (var i in storagePlugins) {
-          // Because i will change before the promise is resolved
-          // we use a self executing function to inject the variable
-          // into a different scope
-          var then = (function(type) {
-            return function (response) {
-              return Object.assign(response, {
-                type: type
-              })
+        return pdf
+          .toFile(pdfPath)
+          .then(function(response){
+            var storage = {
+              local: pdfPath
             }
-          })(i)
+            var storagePluginPromises = []
+            for (var i in storagePlugins) {
+              // Because i will change before the promise is resolved
+              // we use a self executing function to inject the variable
+              // into a different scope
+              var then = (function(type) {
+                return function (response) {
+                  return Object.assign(response, {
+                    type: type
+                  })
+                }
+              })(i)
 
-          storagePluginPromises.push(
-            storagePlugins[i](path, job).then(then)
-          )
-        }
-
-        return Promise.all(storagePluginPromises).then(responses => {
-          for(var i in responses) {
-            var response = responses[i]
-
-            storage[response.type] = {
-              path: response.path,
-              meta: response.meta || {}
+              storagePluginPromises.push(
+                storagePlugins[i](path, job).then(then)
+              )
             }
-          }
 
-          return Object.assign(
-            createResponseObject(),
-            {
-              storage: storage
-            }
-          )
-        })
+            return Promise.all(storagePluginPromises).then(responses => {
+              for(var i in responses) {
+                var response = responses[i]
+
+                storage[response.type] = {
+                  path: response.path,
+                  meta: response.meta || {}
+                }
+              }
+
+              return Object.assign(
+                createResponseObject(),
+                {
+                  storage: storage
+                }
+              )
+            })
+          })
       })
       .catch(msg => {
         var response = error.createErrorResponse(error.ERROR_HTML_PDF_CHROME_ERROR)
