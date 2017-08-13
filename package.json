@@ -19,7 +19,7 @@
   "scripts": {
     "example": "DEBUG=pdf:* node ./bin/pdf-bot.js --config ./examples/pdf-bot.config.js",
     "example:receiving-api": "DEBUG=pdf:* node ./examples/receiving-api.js",
-    "test": "mocha test/*.test.js --recursive",
+    "test": "nyc --reporter=lcov --reporter=text mocha test/*.test.js --recursive --coverage",
     "test:watch": "mocha -w test/*.test.js --recursive"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "assert": "^1.4.1",
     "coveralls": "^2.13.1",
     "mocha": "^3.5.0",
+    "nyc": "^11.1.0",
     "proxyquire": "^1.8.0",
     "sinon": "^3.0.0",
     "supertest": "^3.0.0"
