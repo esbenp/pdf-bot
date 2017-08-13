@@ -408,10 +408,13 @@ $ pdf-bot.js --config ./examples/pdf-bot.config.js --help
   Commands:
 
     api                   Start the API
+    install
+    generate [jobID]      Generate PDF for job
     jobs [options]        List all completed jobs
     ping [jobID]          Attempt to ping webhook for job
     ping:retry-failed
     pings [jobId]         List pings for a job
+    purge [options]       Will remove all completed jobs
     push [options] [url]  Push new job to the queue
     shift                 Run the next job in the queue
 ```
