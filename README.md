@@ -1,5 +1,7 @@
 # 🤖 pdf-bot
 
+[![npm](https://img.shields.io/npm/v/pdf-bot.svg)](https://www.npmjs.com/package/pdf-bot) [![Build Status](https://travis-ci.org/esbenp/pdf-bot.svg?branch=master)](https://travis-ci.org/esbenp/pdf-bot) [![Coverage Status](https://coveralls.io/repos/esbenp/pdf-bot/badge.svg?branch=master&service=github)](https://coveralls.io/github/esbenp/pdf-bot?branch=master)
+
 Easily create a microservice for generating PDFs using headless Chrome.
 
 `pdf-bot` is installed on a server and will receive URLs to turn into PDFs through its API or CLI. `pdf-bot` will manage a queue of PDF jobs. Once a PDF job has run it will notify you using a webhook so you can fetch the API. `pdf-bot` supports storing PDFs on S3 out of the box. Failed PDF generations and Webhook pings will be retryed after a configurable decaying schedule.
@@ -25,7 +27,7 @@ $ pdf-bot install
 
 ### Configuration
 
-`pdf-bot` comes packaged with sensible defaults. At the very minimum you must have a config file in the same folder from which you are executing `pdf-bot` with a `storagePath` given.
+`pdf-bot` comes packaged with sensible defaults. At the very minimum you must have a config file in the same folder from which you are executing `pdf-bot` with a `storagePath` given. However, in reality what you probably want to do is use the `pdf-bot install` command to generate a configuration file and then use an alias `ALIAS pdf-bot = "pdf-bot -c /home/pdf-bot.config.js"`
 
 `pdf-bot.config.js`
 ```js
