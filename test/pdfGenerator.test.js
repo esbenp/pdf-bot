@@ -9,7 +9,9 @@ describe('PDF Generator', function() {
   var createStub
   beforeEach(function(){
     pdf = {
-      toFile: sinon.spy()
+      toFile: sinon.stub().returns(new Promise(function(resolve){
+        resolve()
+      }))
     }
     createStub = sinon.stub(htmlPdf, 'create');
     createStub.onCall(0).returns(new Promise((resolve) => resolve(pdf)))
