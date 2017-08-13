@@ -150,8 +150,8 @@ api.post('/hook', function (req, res) {
 We setup our crontab to continously look for jobs that have not yet been completed.
 
 ```bash
-* * * * * pdf-bot -c ~/pdf-bot.config.js shift >> /var/log/pdfbot.log 2>&1
-* * * * * pdf-bot -c ~/pdf-bot.config.js ping:retry-failed >> /var/log/pdfbot.log 2>&1
+* * * * * node $(npm bin -g)/pdf-bot -c ./pdf-bot.config.js shift >> /var/log/pdfbot.log 2>&1
+* * * * * node $(npm bin -g)/pdf-bot -c ./pdf-bot.config.js ping:retry-failed >> /var/log/pdfbot.log 2>&1
 ```
 
 ### Quick example using the CLI

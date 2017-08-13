@@ -27,7 +27,8 @@ function createQueue (path, options = {}, initialValue = []) {
     getList: createQueueMethod(getList),
     getNext: createQueueMethod(getNext),
     getNextWithoutSuccessfulPing: createQueueMethod(getNextWithoutSuccessfulPing),
-    processJob: createQueueMethod(processJob)
+    processJob: createQueueMethod(processJob),
+    purge: createQueueMethod(purge)
   }
 }
 
@@ -163,6 +164,35 @@ function getNextWithoutSuccessfulPing (db, shouldWait, maxTries = 5) {
     })
     .take(1)
     .value()[0]
+}
+
+function purge (db, failed = false, pristine = false, maxTries = 5) {
+  var query = db.get('queue').slice(0)
+
+  query = query.filter(function (job) {
+    // failed jobs
+    if (failed && job.completed_at === null && job.generations.length >= maxTries) {
+      return false
+    }
+
+    // new jobs
+    if (pristine && job.completed_at === null && job.generations.length < maxTries) {
+      return false
+    }
+
+    // completed jobs
+    if (job.completed_at !== null) {
+      return false
+    }
+
+    return true
+  })
+
+  var queue = query.value()
+
+  return db
+    .assign({ queue: queue })
+    .write()
 }
 
 // ==========

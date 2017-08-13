@@ -234,6 +234,58 @@ describe('queue : retrieval', function() {
 
     assert.equal(job.id, 3)
   })
+
+  it('should purge queue for completed', function() {
+    queue = createQueue({}, [
+      createJob(true),
+      createJob(true),
+      createJob(false),
+      createJob(false, 1)
+    ])
+
+    queue.purge(false, false, 5)
+
+    var contents = getQueue()
+
+    assert.equal(contents.length, 2)
+    assert.equal(contents[0].id, 3)
+    assert.equal(contents[1].id, 4)
+  })
+
+  it('should purge queue for failed', function() {
+    queue = createQueue({}, [
+      createJob(true),
+      createJob(true),
+      createJob(false),
+      createJob(false, 1),
+      createJob(false, 6)
+    ])
+
+    queue.purge(true, false, 5)
+
+    var contents = getQueue()
+
+    assert.equal(contents.length, 2)
+    assert.equal(contents[0].id, 3)
+    assert.equal(contents[1].id, 4)
+  })
+
+  it('should purge queue for new', function() {
+    queue = createQueue({}, [
+      createJob(true),
+      createJob(true),
+      createJob(false),
+      createJob(false, 1),
+      createJob(false, 6)
+    ])
+
+    queue.purge(false, true, 5)
+
+    var contents = getQueue()
+
+    assert.equal(contents.length, 1)
+    assert.equal(contents[0].id, 5)
+  })
 })
 
 describe('queue : processing', function() {

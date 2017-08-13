@@ -253,6 +253,19 @@ program
   })
 
 program
+  .command('purge')
+  .description('Will remove all completed jobs')
+  .option('--failed', 'Remove all failed jobs')
+  .option('--new', 'Remove all new jobs')
+  .action(function (options) {
+    openConfig()
+
+    queue.purge(options.failed, options.new)
+
+    console.log('The queue was purged.')
+  })
+
+program
   .command('push [url]')
   .description('Push new job to the queue')
   .option('-m, --meta [meta]', 'JSON string with meta data. Default: \'{}\'')
