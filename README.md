@@ -14,6 +14,10 @@ Easily create a microservice for generating PDFs using headless Chrome.
 
 Imagine you have an app that creates invoices. You want to save those invoices as PDF. You install `pdf-bot` on a server as an API. Your app server sends the URL of the invoice to the `pdf-bot` server. A cronjob on the `pdf-bot` server keeps checking for new jobs, generates a PDF using headless Chrome and sends the location back to the application server using a webhook.
 
+## Prerequisites
+
+* Node.js v6 or later
+
 ## Installation
 
 ```bash
