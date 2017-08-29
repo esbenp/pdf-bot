@@ -26,7 +26,6 @@
     "body-parser": "^1.17.2",
     "cli-table": "^0.3.1",
     "commander": "^2.11.0",
-    "crypto": "0.0.3",
     "debug": "^2.6.8",
     "express": "^4.15.3",
     "html-pdf-chrome": "^0.2.0",
