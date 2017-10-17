@@ -28,8 +28,10 @@ function createQueue (path, options = {}, initialValue = []) {
     getNext: createQueueMethod(getNext),
     getAllUnfinished: createQueueMethod(getAllUnfinished),
     getNextWithoutSuccessfulPing: createQueueMethod(getNextWithoutSuccessfulPing),
+    isBusy: createQueueMethod(isBusy),
     processJob: createQueueMethod(processJob),
-    purge: createQueueMethod(purge)
+    purge: createQueueMethod(purge),
+    setIsBusy: createQueueMethod(setIsBusy)
   }
 }
 
@@ -170,6 +172,10 @@ function getNextWithoutSuccessfulPing (db, shouldWait, maxTries = 5) {
     .value()[0]
 }
 
+function isBusy (db) {
+  return db.get('is_busy').value() || false
+}
+
 function purge (db, failed = false, pristine = false, maxTries = 5) {
   var query = db.get('queue').slice(0)
 
@@ -197,6 +203,10 @@ function purge (db, failed = false, pristine = false, maxTries = 5) {
   for(var i in queue) {
     db.get('queue').remove({ id: queue[i].id }).write()
   }
+}
+
+function setIsBusy(db, isBusy) {
+  return db.set('is_busy', isBusy).write()
 }
 
 // ==========

@@ -310,6 +310,11 @@ program
   .action(function (url) {
     openConfig()
 
+    var isBusy = queue.isBusy()
+    if (isBusy) {
+      return
+    }
+
     var maxTries = configuration.queue.generationMaxTries
     var retryStrategy = configuration.queue.generationRetryStrategy
     var parallelism = configuration.queue.parallelism
@@ -319,25 +324,34 @@ program
     if (jobs.length > 0) {
       var chunks = chunk(jobs, parallelism)
 
-      function runNextChunk(i = 1) {
+      function runNextChunk(k = 1) {
         if (chunks.length === 0) {
+          queue.setIsBusy(false)
           process.exit(0)
         } else {
           var chunk = chunks.shift()
-          console.log('Running chunk %s, %s chunks left', i, chunks.length)
+          console.log('Running chunk %s, %s chunks left', k, chunks.length)
 
           var promises = []
           for(var i in chunk) {
             promises.push(processJob(chunk[i], configuration, false))
           }
 
-          Promise.all(promises).then(function(){
-            runNextChunk(i + 1)
-          })
+          Promise.all(promises)
+            .then(function(){
+              runNextChunk(k + 1)
+            })
+            .catch(function(){
+              queue.setIsBusy(false)
+              process.exit(1)
+            })
         }
       }
 
       console.log('Found %s jobs, divided into %s chunks', jobs.length, chunks.length)
+
+      queue.setIsBusy(true)
+
       runNextChunk()
     }
   })
