@@ -312,7 +312,7 @@ program
 
     var isBusy = queue.isBusy()
     if (isBusy) {
-      return
+      process.exit(0)
     }
 
     var maxTries = configuration.queue.generationMaxTries
