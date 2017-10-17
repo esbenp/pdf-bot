@@ -26,6 +26,7 @@ function createQueue (path, options = {}, initialValue = []) {
     getById: createQueueMethod(getById),
     getList: createQueueMethod(getList),
     getNext: createQueueMethod(getNext),
+    getAllUnfinished: createQueueMethod(getAllUnfinished),
     getNextWithoutSuccessfulPing: createQueueMethod(getNextWithoutSuccessfulPing),
     processJob: createQueueMethod(processJob),
     purge: createQueueMethod(purge)
@@ -103,6 +104,10 @@ function getById (db, id) {
 }
 
 function getNext (db, shouldWait, maxTries = 5) {
+  return getAllUnfinished(db, shouldWait, maxTries)[0]
+}
+
+function getAllUnfinished (db, shouldWait, maxTries = 5) {
   return db
     .get('queue')
     .filter(function (job) {
@@ -126,8 +131,7 @@ function getNext (db, shouldWait, maxTries = 5) {
 
       return false
     })
-    .take(1)
-    .value()[0]
+    .value()
 }
 
 function getNextWithoutSuccessfulPing (db, shouldWait, maxTries = 5) {

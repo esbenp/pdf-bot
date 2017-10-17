@@ -6,6 +6,7 @@ var debug = require('debug')('pdf:cli')
 var Table = require('cli-table')
 var program = require('commander');
 var merge = require('lodash.merge')
+var chunk = require('lodash.chunk')
 var createPdfGenerator = require('../src/pdfGenerator')
 var createApi = require('../src/api')
 var error = require('../src/error')
@@ -42,6 +43,7 @@ var defaultConfig = {
       return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
     },
     generationMaxTries: 5,
+    parallelism: 4,
     webhookRetryStrategy: function(job, retries) {
       return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
     },
@@ -302,25 +304,67 @@ program
     }
   })
 
+program
+  .command('shift:all')
+  .description('Run all unfinished jobs in the queue')
+  .action(function (url) {
+    openConfig()
+
+    var maxTries = configuration.queue.generationMaxTries
+    var retryStrategy = configuration.queue.generationRetryStrategy
+    var parallelism = configuration.queue.parallelism
+
+    var jobs = queue.getAllUnfinished(retryStrategy, maxTries)
+
+    if (jobs.length > 0) {
+      var chunks = chunk(jobs, parallelism)
+
+      function runNextChunk(i = 1) {
+        if (chunks.length === 0) {
+          process.exit(0)
+        } else {
+          var chunk = chunks.shift()
+          console.log('Running chunk %s, %s chunks left', i, chunks.length)
+
+          var promises = []
+          for(var i in chunk) {
+            promises.push(processJob(chunk[i], configuration, false))
+          }
+
+          Promise.all(promises).then(function(){
+            runNextChunk(i + 1)
+          })
+        }
+      }
+
+      console.log('Found %s jobs, divided into %s chunks', jobs.length, chunks.length)
+      runNextChunk()
+    }
+  })
+
 program.parse(process.argv)
 
 if (!process.argv.slice(2).length) {
   program.outputHelp();
 }
 
-function processJob(job, configuration) {
+function processJob(job, configuration, exitProcess = true) {
   var generatorOptions = configuration.generator
   var storagePlugins = configuration.storage
 
   var generator = createPdfGenerator(configuration.storagePath, generatorOptions, storagePlugins)
 
-  queue.processJob(generator, job, configuration.webhook).then(response => {
+  return queue.processJob(generator, job, configuration.webhook).then(response => {
     if (error.isError(response)) {
       console.error(response.message)
-      process.exit(1)
+      if (exitProcess) {
+        process.exit(1)
+      }
     } else {
       console.log('Job ID ' + job.id + ' was processed.')
-      process.exit(0)
+      if (exitProcess) {
+        process.exit(0)
+      }
     }
   })
 }
