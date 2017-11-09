@@ -7,6 +7,7 @@ var Table = require('cli-table')
 var program = require('commander');
 var merge = require('lodash.merge')
 var chunk = require('lodash.chunk')
+var clone = require('lodash.clonedeep');
 var createPdfGenerator = require('../src/pdfGenerator')
 var createApi = require('../src/api')
 var error = require('../src/error')
@@ -334,7 +335,7 @@ program
 
           var promises = []
           for(var i in chunk) {
-            promises.push(processJob(chunk[i], configuration, false))
+            promises.push(processJob(chunk[i], clone(configuration), false))
           }
 
           Promise.all(promises)
