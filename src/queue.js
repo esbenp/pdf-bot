@@ -15,6 +15,7 @@ function createQueue (db, options = {}) {
   return {
     addToQueue: createQueueMethod(addToQueue),
     attemptPing: createQueueMethod(attemptPing),
+    close: createQueueMethod(close),
     getById: createQueueMethod(getById),
     getList: createQueueMethod(getList),
     getNext: createQueueMethod(getNext),
@@ -55,6 +56,10 @@ function addToQueue (db, data) {
   debug('Pushing job to queue with data %s', JSON.stringify(data))
 
   return db.pushToQueue(data)
+}
+
+function close(db) {
+  return db.close()
 }
 
 // =========

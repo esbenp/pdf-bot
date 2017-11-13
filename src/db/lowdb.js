@@ -24,6 +24,7 @@ function createLowDb(options = {}) {
     }
 
     return {
+      close: createDbMethod(close),
       getAllUnfinished: createDbMethod(getAllUnfinished),
       getById: createDbMethod(getById),
       getList: createDbMethod(getList),
@@ -49,6 +50,10 @@ function pushToQueue (db, data) {
     .write()
 
   return data
+}
+
+function close() {
+  return true
 }
 
 function getAllUnfinished (db, shouldWait, maxTries = 5) {

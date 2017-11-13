@@ -23,6 +23,7 @@ function createPostgresDb(options = {}) {
     }
 
     return {
+      close: createDbMethod(close),
       destroy: createDbMethod(destroy),
       getAllUnfinished: createDbMethod(getAllUnfinished),
       getById: createDbMethod(getById),
@@ -42,6 +43,10 @@ function createPostgresDb(options = {}) {
 }
 
 module.exports = createPostgresDb
+
+function close (db) {
+  db.end()
+}
 
 function pushToQueue (db, data) {
   return db

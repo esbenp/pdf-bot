@@ -176,6 +176,7 @@ program
     return db.migrate()
       .then(function () {
         console.log('The database was migrated')
+        db.close()
         process.exit(0)
       })
       .catch(handleDbError)
@@ -204,6 +205,7 @@ program
         db.destroy()
           .then(function() {
             console.log('The database has been destroyed.')
+            db.close()
             process.exit(0)
           })
           .catch(handleDbError)
@@ -221,6 +223,7 @@ program
       .then(function (job) {
         if (!job) {
           console.error('Job not found')
+          queue.close()
           process.exit(1)
         }
 
@@ -240,6 +243,7 @@ program
 
     return listJobs(queue, options.failed, options.completed, options.limit)
       .then(function() {
+        queue.close()
         process.exit(0)
       })
       .catch(handleDbError)
@@ -254,11 +258,14 @@ program
     return queue.getById(jobId)
       .then(function (job) {
         if (!job) {
+          queue.close()
           console.log('Job not found.')
           return;
         }
 
         return ping(job, configuration.webhook).then(response => {
+          queue.close()
+
           if (response.error) {
             process.exit(1)
           } else {
@@ -280,10 +287,13 @@ program
     queue.getNextWithoutSuccessfulPing(retryStrategy, maxTries)
       .then(function (next) {
         if (!next) {
+          queue.close()
           process.exit(0)
         }
 
         return ping(next, configuration.webhook).then(function (response) {
+          queue.close()
+
           if (response.error) {
             process.exit(1)
           } else {
@@ -303,6 +313,7 @@ program
     var job = queue.getById(jobId)
       .then(function (job) {
         if (!job) {
+          queue.close()
           console.log('Job not found')
           process.exit(1)
         }
@@ -327,6 +338,7 @@ program
         }
 
         console.log(table.toString())
+        queue.close()
         process.exit(0)
       })
       .catch(handleDbError)
@@ -342,6 +354,7 @@ program
 
     return queue.purge(options.failed, options.new)
       .then(function () {
+        queue.close()
         console.log('The queue was purged.')
         process.exit(0)
       })
@@ -361,6 +374,8 @@ program
         meta: JSON.parse(options.meta || '{}')
       })
       .then(function (response) {
+        queue.close()
+
         if (error.isError(response)) {
           console.error('Could not push to queue: %s', response.message)
           process.exit(1)
@@ -384,6 +399,7 @@ program
     return queue.getNext(retryStrategy, maxTries)
       .then(function (next) {
         if (!next) {
+          queue.close()
           process.exit(0)
         }
 
@@ -401,6 +417,7 @@ program
     return queue.isBusy()
       .then(function (isBusy) {
         if (isBusy) {
+          queue.close()
           process.exit(0)
         }
 
@@ -411,6 +428,7 @@ program
         return queue.getAllUnfinished(retryStrategy, maxTries)
           .then(function (jobs) {
             if (jobs.length === 0) {
+              queue.close()
               process.exit(0)
             }
 
@@ -419,6 +437,7 @@ program
             function runNextChunk(k = 1) {
               if (chunks.length === 0) {
                 queue.setIsBusy(false).then(function() {
+                  queue.close()
                   process.exit(0)
                 })
               } else {
@@ -436,6 +455,7 @@ program
                   })
                   .catch(function(){
                     return queue.setIsBusy(false).then(function() {
+                      queue.close()
                       process.exit(1)
                     })
                   })
@@ -468,11 +488,13 @@ function processJob(job, configuration, exitProcess = true) {
     if (error.isError(response)) {
       console.error(response.message)
       if (exitProcess) {
+        queue.close()
         process.exit(1)
       }
     } else {
       console.log('Job ID ' + job.id + ' was processed.')
       if (exitProcess) {
+        queue.close()
         process.exit(0)
       }
     }
@@ -575,5 +597,6 @@ function formatDate(input) {
 
 function handleDbError(e) {
   console.error(e)
+  queue.close()
   process.exit(1)
 }
