@@ -28,10 +28,12 @@ describe('api: POST /', function () {
     queue = function () {
       return {
         addToQueue: function() {
-          return {
-            code: '001',
-            error: true
-          }
+          return new Promise(function (resolve) {
+            resolve({
+              code: '001',
+              error: true
+            })
+          })
         }
       }
     }
@@ -50,7 +52,7 @@ describe('api: POST /', function () {
     var meta = {id: 1}
 
     var addToQueue = sinon.stub()
-    addToQueue.onCall(0).returns({ id: '1234' })
+    addToQueue.onCall(0).returns(new Promise(function (resolve) { resolve({ id: '1234' }) }))
 
     var queue = function() {
       return {

@@ -3,8 +3,10 @@ var fs = require('fs')
 var path = require('path')
 var sinon = require('sinon')
 var baseCreateQueue = require('../src/queue')
+var lowDb = require('../src/db/lowdb')
 var error = require('../src/error')
 var webhook = require('../src/webhook')
+var merge = require('lodash.merge')
 
 var queuePath = path.join(__dirname, 'db.json')
 
@@ -16,12 +18,17 @@ function deleteQueue() {
   fs.unlinkSync(queuePath)
 }
 
-function createQueue() {
+function createQueue(options = {}, initialValue = []) {
   // Some times we want to create the queue in the test
   if (fs.existsSync(queuePath)) {
     deleteQueue()
   }
-  return baseCreateQueue.apply(this, [queuePath].concat([].slice.call(arguments)))
+
+  var db = lowDb(merge(options, {
+    initialValue: initialValue,
+    path: path.join(__dirname, 'db.json')
+  }))()
+  return baseCreateQueue(db)
 }
 
 var i = 0
@@ -101,10 +108,10 @@ describe('queue : retrieval', function() {
       createJob(false, 0) // has not been run yet
     ])
 
-    var list = queue.getList(true)
-
-    assert.equal(list.length, 2)
-    assert.equal(list[0].id, 1)
+    return queue.getList(true).then(function(list) {
+      assert.equal(list.length, 2)
+      assert.equal(list[0].id, 1)
+    })
   })
 
   it('should return completed jobs', function() {
@@ -114,10 +121,10 @@ describe('queue : retrieval', function() {
       createJob(false, 1)
     ])
 
-    var list = queue.getList(false, true)
-
-    assert.equal(list.length, 2)
-    assert.equal(list[1].id, 2)
+    return queue.getList(false, true).then(function (list) {
+      assert.equal(list.length, 2)
+      assert.equal(list[1].id, 2)
+    })
   })
 
   it('should return new jobs', function() {
@@ -128,10 +135,10 @@ describe('queue : retrieval', function() {
       createJob(false, 0) // new
     ])
 
-    var list = queue.getList(false, false)
-
-    assert.equal(list.length, 1)
-    assert.equal(list[0].id, 4)
+    return queue.getList(false, false).then(function (list) {
+      assert.equal(list.length, 1)
+      assert.equal(list[0].id, 4)
+    })
   })
 
   it('should limit', function() {
@@ -142,9 +149,9 @@ describe('queue : retrieval', function() {
 
     queue = createQueue({}, jobs)
 
-    var list = queue.getList(false, false, 10)
-
-    assert.equal(list.length, 10)
+    return queue.getList(false, false, 10).then(function (list) {
+      assert.equal(list.length, 10)
+    })
   })
 
   it('should return the correct job by id', function() {
@@ -154,9 +161,9 @@ describe('queue : retrieval', function() {
       createJob(true)
     ])
 
-    var job = queue.getById(2)
-
-    assert.equal(job.meta.correct, true)
+    return queue.getById(2).then(function (job) {
+      assert.equal(job.meta.correct, true)
+    })
   })
 
   it('should return the next job if no tries were found', function() {
@@ -167,9 +174,9 @@ describe('queue : retrieval', function() {
       createJob(true)
     ])
 
-    var job = queue.getNext(function(){}, 5)
-
-    assert.equal(job.id, 3)
+    return queue.getNext(function(){}, 5).then(function (job) {
+      assert.equal(job.id, 3)
+    })
   })
 
   it('should return the next job that is within decay schedule', function() {
@@ -188,9 +195,9 @@ describe('queue : retrieval', function() {
       Object.assign(createJob(false), { generations: [{id: 1, generated_at: dateTwo }] })
     ])
 
-    var job = queue.getNext(function(){ return 1000 * 60 * 4 }, 5)
-
-    assert.equal(job.id, 4)
+    return queue.getNext(function(){ return 1000 * 60 * 4 }, 5).then(function (job) {
+      assert.equal(job.id, 4)
+    })
   })
 
   it('should get next with no pings', function() {
@@ -205,9 +212,9 @@ describe('queue : retrieval', function() {
       Object.assign(createJob(true, 1), {pings: [{id:55, sent_at: fiveMinutesAgo(), error: true }]})
     ])
 
-    var job = queue.getNextWithoutSuccessfulPing(function(){ return 1000 * 60 * 4 }, 5)
-
-    assert.equal(job.id, 3)
+    return queue.getNextWithoutSuccessfulPing(function(){ return 1000 * 60 * 4 }, 5).then(function (job) {
+      assert.equal(job.id, 3)
+    })
   })
 
   it('should get next ping that is within decay schedule', function() {
@@ -230,9 +237,9 @@ describe('queue : retrieval', function() {
       Object.assign(createJob(true), { pings: [{ id: 5, error: true, sent_at: dateOne }] })
     ])
 
-    var job = queue.getNextWithoutSuccessfulPing(function() { return 1000 * 60 * 4 }, 5)
-
-    assert.equal(job.id, 3)
+    queue.getNextWithoutSuccessfulPing(function() { return 1000 * 60 * 4 }, 5).then(function (job) {
+      assert.equal(job.id, 3)
+    })
   })
 
   it('should purge queue for completed', function() {
@@ -243,13 +250,13 @@ describe('queue : retrieval', function() {
       createJob(false, 1)
     ])
 
-    queue.purge(false, false, 5)
+    return queue.purge(false, false, 5).then(function() {
+      var contents = getQueue()
 
-    var contents = getQueue()
-
-    assert.equal(contents.length, 2)
-    assert.equal(contents[0].id, 3)
-    assert.equal(contents[1].id, 4)
+      assert.equal(contents.length, 2)
+      assert.equal(contents[0].id, 3)
+      assert.equal(contents[1].id, 4)
+    })
   })
 
   it('should purge queue for failed', function() {
@@ -261,13 +268,13 @@ describe('queue : retrieval', function() {
       createJob(false, 6)
     ])
 
-    queue.purge(true, false, 5)
+    return queue.purge(true, false, 5).then(function () {
+      var contents = getQueue()
 
-    var contents = getQueue()
-
-    assert.equal(contents.length, 2)
-    assert.equal(contents[0].id, 3)
-    assert.equal(contents[1].id, 4)
+      assert.equal(contents.length, 2)
+      assert.equal(contents[0].id, 3)
+      assert.equal(contents[1].id, 4)
+    })
   })
 
   it('should purge queue for new', function() {
@@ -279,12 +286,12 @@ describe('queue : retrieval', function() {
       createJob(false, 6)
     ])
 
-    queue.purge(false, true, 5)
+    queue.purge(false, true, 5).then(function() {
+      var contents = getQueue()
 
-    var contents = getQueue()
-
-    assert.equal(contents.length, 1)
-    assert.equal(contents[0].id, 5)
+      assert.equal(contents.length, 1)
+      assert.equal(contents[0].id, 5)
+    })
   })
 })
 
@@ -353,7 +360,7 @@ describe('queue : processing', function() {
       assert(response.completed, true)
 
       var pingArgs = pingStub.args[0]
-      assert.equal(pingArgs[0], job)
+      assert.equal(pingArgs[0].id, job.id)
       assert.equal(pingArgs[1], webhookOptions)
 
       pingStub.restore()
