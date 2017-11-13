@@ -34,7 +34,8 @@ describe('api: POST /', function () {
               error: true
             })
           })
-        }
+        },
+        close: function(){}
       }
     }
     var api = createApi(queue, {
@@ -56,7 +57,8 @@ describe('api: POST /', function () {
 
     var queue = function() {
       return {
-        addToQueue: addToQueue
+        addToQueue: addToQueue,
+        close: function(){}
       }
     }
     var api = createApi(queue, {
