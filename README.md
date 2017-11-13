@@ -154,7 +154,7 @@ api.post('/hook', function (req, res) {
 We setup our crontab to continuously look for jobs that have not yet been completed.
 
 ```bash
-* * * * * node $(npm bin -g)/pdf-bot -c ./pdf-bot.config.js shift >> /var/log/pdfbot.log 2>&1
+* * * * * node $(npm bin -g)/pdf-bot -c ./pdf-bot.config.js shift:all >> /var/log/pdfbot.log 2>&1
 * * * * * node $(npm bin -g)/pdf-bot -c ./pdf-bot.config.js ping:retry-failed >> /var/log/pdfbot.log 2>&1
 ```
 
@@ -166,10 +166,10 @@ Let us assume I want to generate a PDF for `https://esbenp.github.io`. I can add
 $ pdf-bot -c ./pdf-bot.config.js push https://esbenp.github.io --meta '{"id":1}'
 ```
 
-Next, if my crontab is not setup to run it automatically I can run it using the `shift` command
+Next, if my crontab is not setup to run it automatically I can run it using the `shift:all` command
 
 ```bash
-$ pdf-bot -c ./pdf-bot.config.js shift
+$ pdf-bot -c ./pdf-bot.config.js shift:all
 ```
 
 This will look for the oldest uncompleted job and run it.
@@ -283,6 +283,54 @@ curl -X POST -H 'Authorization: Bearer api-token' -H 'Content-Type: application/
   }'
 ```
 
+## Database
+
+### LowDB (file-database) (default)
+
+If you have low conurrency (run a job every now and then) you can use the default database driver that uses LowDB.
+
+```javascript
+var LowDB = require('pdf-bot/src/db/lowdb')
+
+module.exports = {
+  api: {
+    token: 'api-token'
+  },
+  db: LowDB({
+    lowDbOptions: {},
+    path: '' // defaults to $storagePath/db/db.json
+  }),
+  webhook: {
+    secret: '1234',
+    url: 'http://localhost:3000/webhooks/pdf'
+  }
+}
+```
+
+### PostgreSQL
+
+```javascript
+var pgsql = require('pdf-bot/src/db/pgsql')
+
+module.exports = {
+  api: {
+    token: 'api-token'
+  },
+  db: pgsql({
+    database: 'pdfbot',
+    username: 'pdfbot',
+    password: 'pdfbot',
+    port: 5432
+  }),
+  webhook: {
+    secret: '1234',
+    url: 'http://localhost:3000/webhooks/pdf'
+  }
+}
+```
+
+To install the necessary database tables, run `db:migrate`. You can also destroy the database by running `db:destroy`.
+
 ## Storage
 
 Currently `pdf-bot` comes bundled with build-in support for storing PDFs on Amazon S3.
@@ -335,6 +383,7 @@ module.exports = {
     // The token used to validate requests to your API. Not required, but 100% recommended.
     token: 'api-token'
   },
+  db: LowDB(), // see other drivers under Database
   // html-pdf-chrome
   generator: {
     // Triggers that specify when the PDF should be generated
@@ -351,6 +400,8 @@ module.exports = {
     // How many times should pdf-bot try to generate a PDF?
     // (default: 5)
     generationMaxTries: 5,
+    // How many generations to run at the same time when using shift:all
+    parallelism: 4,
     // How frequent should pdf-bot retry failed webhook pings?
     // (default: 1 min, 3 min, 10 min, 30 min, 60 min)
     webhookRetryStrategy: function(job, retries) {
@@ -358,13 +409,7 @@ module.exports = {
     },
     // How many times should pdf-bot try to ping a webhook?
     // (default: 5)
-    webhookMaxTries: 5,
-    // In what path should the database be stored?
-    path: 'storage/db/db.json',
-    // pdf-bot uses lowdb. You can pass options to it here.
-    lowDbOptions: {
-
-    }
+    webhookMaxTries: 5
   },
   storage: {
     's3': createS3Config({
@@ -412,6 +457,8 @@ $ pdf-bot.js --config ./examples/pdf-bot.config.js --help
   Commands:
 
     api                   Start the API
+    db:migrate
+    db:destroy
     install
     generate [jobID]      Generate PDF for job
     jobs [options]        List all completed jobs
@@ -421,6 +468,7 @@ $ pdf-bot.js --config ./examples/pdf-bot.config.js --help
     purge [options]       Will remove all completed jobs
     push [options] [url]  Push new job to the queue
     shift                 Run the next job in the queue
+    shift:all             Run all unfinished jobs in the queue
 ```
 
 ## Debug mode

@@ -90,11 +90,11 @@ function getById (db, id) {
 function getList (db, failed = false, completed = false, limit) {
   var query = 'SELECT * FROM jobs WHERE (completed_at is null AND jsonb_array_length(generations) = 0) '
 
-  if (!failed) {
+  if (failed) {
     query += ' OR (completed_at is null AND jsonb_array_length(generations) > 0)'
   }
 
-  if (!completed) {
+  if (completed) {
     query += ' OR (completed_at is not null)'
   }
 

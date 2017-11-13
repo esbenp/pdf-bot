@@ -115,11 +115,14 @@ function processJob (db, generator, job, webhookOptions) {
                 return response
               }
 
-              // Important to return promise otherwise the npm cli process will exit early
-              return attemptPing(db, job, webhookOptions)
-                .then(function() {
-                  return response
-                })
+              // Re-fetch the job as storage has been added
+              return getById(db, job.id).then(function (job) {
+                // Important to return promise otherwise the npm cli process will exit early
+                return attemptPing(db, job, webhookOptions)
+                  .then(function() {
+                    return response
+                  })
+              })
             })
           }
 

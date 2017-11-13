@@ -23,17 +23,18 @@ function createApi(createQueue, options = {}) {
       return
     }
 
-    var response = queue.addToQueue({
-      url: req.body.url,
-      meta: req.body.meta || {}
-    })
+    queue
+      .addToQueue({
+        url: req.body.url,
+        meta: req.body.meta || {}
+      }).then(function (response) {
+        if (error.isError(response)) {
+          res.status(422).json(response)
+          return
+        }
 
-    if (error.isError(response)) {
-      res.status(422).json(response)
-      return
-    }
-
-    res.status(201).json(response)
+        res.status(201).json(response)
+      })
   })
 
   return api
