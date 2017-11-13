@@ -360,7 +360,7 @@ describe('queue : processing', function() {
       assert(response.completed, true)
 
       var pingArgs = pingStub.args[0]
-      assert.equal(pingArgs[0], job)
+      assert.equal(pingArgs[0].id, job.id)
       assert.equal(pingArgs[1], webhookOptions)
 
       pingStub.restore()
