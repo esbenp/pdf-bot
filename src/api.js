@@ -28,6 +28,8 @@ function createApi(createQueue, options = {}) {
         url: req.body.url,
         meta: req.body.meta || {}
       }).then(function (response) {
+        queue.close()
+
         if (error.isError(response)) {
           res.status(422).json(response)
           return
