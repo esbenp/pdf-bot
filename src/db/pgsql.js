@@ -167,7 +167,7 @@ function purge (db, failed = false, pristine = false, maxTries = 5) {
     params.push(maxTries)
   }
 
-  return db.query(query)
+  return db.query(query, params)
 }
 
 function setIsBusy (db, isBusy) {
