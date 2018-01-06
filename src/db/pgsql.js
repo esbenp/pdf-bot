@@ -5,14 +5,37 @@ var utils = require('../utils')
 var pg = require('pg')
 
 function createPostgresDb(options = {}) {
+  function parseConfig() {
+    var config = {};
+
+    if (options.connectionString != undefined) {
+      config.connectionString = options.connectionString;
+    } else {
+      config.user     = options.user;
+      config.host     = options.host || 'localhost';
+      config.database = options.database;
+      config.password = options.password;
+      config.port     = options.port || 5432;
+    }
+
+    if (options.ssl != undefined) {
+      config.ssl = options.ssl;
+    }
+
+    if (options.types != undefined) {
+      config.types = options.types;
+    }
+
+    if (options.statement_timeout != undefined) {
+      config.statement_timeout = options.statement_timeout;
+    }
+
+    return config;
+  };
+
+
   return function (pdfBotConfiguration) {
-    var db = new pg.Client({
-      user: options.user,
-      host: options.host || 'localhost',
-      database: options.database,
-      password: options.password,
-      port: options.port || 5432,
-    })
+    var db = new pg.Client(parseConfig());
     db.connect()
 
     var createDbMethod = function (func) {
