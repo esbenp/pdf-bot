@@ -12,7 +12,7 @@ function createLowDb(options = {}) {
     var db = low(options.path, options.lowDbOptions || {})
 
     db.defaults({
-        queue: options.initialValue
+        queue: options.initialValue || []
       })
       .write()
 
