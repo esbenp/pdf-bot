@@ -382,6 +382,8 @@ module.exports = {
   api: {
     // The port your express.js instance listens to requests from. (default: 3000)
     port: 3000,
+    // Spawn command when a job has been pushed to the API
+    postPushCommand: ['/home/user/.npm-global/bin/pdf-bot', ['-c', './pdf-bot.config.js', 'shift:all']],
     // The token used to validate requests to your API. Not required, but 100% recommended.
     token: 'api-token'
   },
