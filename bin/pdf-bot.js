@@ -34,6 +34,7 @@ var configuration, queue
 var defaultConfig = {
   api: {
     port: 3000,
+    //postPushCommand: '',
     //token: 'api-token'
   },
   db: lowDb(),
@@ -90,6 +91,7 @@ program
 
     createApi(initiateQueue, {
       port: port,
+      postPushCommand: apiOptions.postPushCommand,
       token: apiOptions.token
     }).listen(port, function() {
       debug('Listening to port %d', port)
@@ -421,53 +423,54 @@ program
           process.exit(0)
         }
 
-        var maxTries = configuration.queue.generationMaxTries
-        var retryStrategy = configuration.queue.generationRetryStrategy
-        var parallelism = configuration.queue.parallelism
+        var shiftAll = function () {
+          var maxTries = configuration.queue.generationMaxTries
+          var retryStrategy = configuration.queue.generationRetryStrategy
+          var parallelism = configuration.queue.parallelism
 
-        return queue.getAllUnfinished(retryStrategy, maxTries)
-          .then(function (jobs) {
-            if (jobs.length === 0) {
-              queue.close()
-              process.exit(0)
-            }
-
-            var chunks = chunk(jobs, parallelism)
-
-            function runNextChunk(k = 1) {
-              if (chunks.length === 0) {
-                queue.setIsBusy(false).then(function() {
-                  queue.close()
-                  process.exit(0)
-                })
-              } else {
-                var chunk = chunks.shift()
-                console.log('Running chunk %s, %s chunks left', k, chunks.length)
-
-                var promises = []
-                for(var i in chunk) {
-                  promises.push(processJob(chunk[i], clone(configuration), false))
-                }
-
-                Promise.all(promises)
-                  .then(function(){
-                    return runNextChunk(k + 1)
-                  })
-                  .catch(function(){
-                    return queue.setIsBusy(false).then(function() {
-                      queue.close()
-                      process.exit(1)
-                    })
-                  })
+          return queue.getAllUnfinished(retryStrategy, maxTries)
+            .then(function (jobs) {
+              if (jobs.length === 0) {
+                queue.close()
+                process.exit(0)
               }
-            }
 
-            console.log('Found %s jobs, divided into %s chunks', jobs.length, chunks.length)
+              var chunks = chunk(jobs, parallelism)
 
-            queue.setIsBusy(true).then(function () {
-              return runNextChunk()
+              function runNextChunk(k = 1) {
+                if (chunks.length === 0) {
+                  queue.setIsBusy(false).then(shiftAll)
+                } else {
+                  var chunk = chunks.shift()
+                  console.log('Running chunk %s, %s chunks left', k, chunks.length)
+
+                  var promises = []
+                  for(var i in chunk) {
+                    promises.push(processJob(chunk[i], clone(configuration), false))
+                  }
+
+                  Promise.all(promises)
+                    .then(function(){
+                      return runNextChunk(k + 1)
+                    })
+                    .catch(function(){
+                      return queue.setIsBusy(false).then(function() {
+                        queue.close()
+                        process.exit(1)
+                      })
+                    })
+                }
+              }
+
+              console.log('Found %s jobs, divided into %s chunks', jobs.length, chunks.length)
+
+              queue.setIsBusy(true).then(function () {
+                return runNextChunk()
+              })
             })
-          })
+        }
+
+        return shiftAll()
       })
       .catch(handleDbError)
   })

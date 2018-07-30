@@ -3,6 +3,7 @@ var express = require('express')
 var bodyParser = require('body-parser')
 var debug = require('debug')('pdf:api')
 var error = require('./error')
+var childProcess = require('child_process')
 
 function createApi(createQueue, options = {}) {
   var api = express()
@@ -33,6 +34,10 @@ function createApi(createQueue, options = {}) {
         if (error.isError(response)) {
           res.status(422).json(response)
           return
+        }
+
+        if (options.postPushCommand && options.postPushCommand.length > 0) {
+          childProcess.spawn.apply(null, options.postPushCommand)
         }
 
         res.status(201).json(response)
