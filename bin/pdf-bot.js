@@ -432,7 +432,7 @@ program
           return queue.getAllUnfinished(retryStrategy, maxTries)
             .then(function (jobs) {
               if (jobs.length === 0) {
-                browser.close().then(() => {
+                return browser.close().then(() => {
                   queue.close()
                   process.exit(0)
                 })
