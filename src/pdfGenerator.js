@@ -32,7 +32,7 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
             var timer = setTimeout(() => {
               console.log(logger.inflightRequests().map(r => r.url()).join("\n"))
               reject(job.id + ' failed timeout.')
-            }, 30000)
+            }, 60000)
 
             page.exposeFunction("htmlPdfCb", () => {
               clearTimeout(timer)
