@@ -12,6 +12,7 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
 
     var generationId = uuid()
     var generated_at = utils.getCurrentDateTimeAsString()
+    var jobId = job.id
 
     function createResponseObject() {
       return {
@@ -73,7 +74,7 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
       .catch(msg => {
         var response = error.createErrorResponse(error.ERROR_HTML_PDF_CHROME_ERROR)
 
-        response.message += ' ' + msg
+        response.message += ' ' + msg + ' (job ID: ' + jobId + '. Generation ID: ' + generationId + ')'
 
         return Object.assign(createResponseObject(), response)
       })

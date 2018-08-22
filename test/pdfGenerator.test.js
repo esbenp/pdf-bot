@@ -24,7 +24,7 @@ describe('PDF Generator', function() {
 
   it('should call html-pdf-chrome with the correct options', function() {
     var options = {options: true}
-    generator = createGenerator('storage', options)('url')
+    generator = createGenerator('storage', options)('url', {id: 1})
 
     if (!createStub.calledOnce || !createStub.calledWith('url', options)) {
       throw new Error('Correct options not passed')
@@ -32,7 +32,7 @@ describe('PDF Generator', function() {
   })
 
   it('should attempt to write pdf to storage', function(done) {
-    generator('url').then(() => {
+    generator('url', {id: 1}).then(() => {
       if (!pdf.toFile.calledOnce || !pdf.toFile.args[0][0].match(/storage\/pdf\/(.+)\.pdf$/)) {
         throw new Error('PDF was not attempted to saved')
       }
@@ -51,7 +51,7 @@ describe('PDF Generator', function() {
       }
     }
 
-    createGenerator('storage', {}, storage)('url').then(response => {
+    createGenerator('storage', {}, storage)('url', {id: 1}).then(response => {
       var storage = response.storage
 
       if (storage.storage_1.path !== 'file_1' || storage.storage_2.path !== 'file_2') {
@@ -65,7 +65,7 @@ describe('PDF Generator', function() {
   it('should return error response thrown promises', function(done) {
     createStub.onCall(0).returns(new Promise((resolve, reject) => reject('error')))
 
-    createGenerator('storage', {}, {})('url').then(response => {
+    createGenerator('storage', {}, {})('url', {id: 1}).then(response => {
       if (!error.isError(response)) {
         throw new Exception('Generator rejection did not resolve in error promise')
       }
