@@ -104,8 +104,8 @@ function setIsBusy(db, isBusy) {
 // PROCESSING
 // ==========
 
-function processJob (db, generator, job, webhookOptions) {
-  return generator(job.url, job)
+function processJob (db, browser, generator, job, webhookOptions) {
+  return generator(browser, job.url, job)
     .then(function (response) {
       return _logGeneration(db, job.id, response)
         .then(function (logResponse) {

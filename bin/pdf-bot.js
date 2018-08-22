@@ -17,6 +17,7 @@ var pjson = require('../package.json')
 var execSync = require('child_process').execSync
 var prompt = require('prompt')
 var lowDb = require('../src/db/lowdb')
+var puppeteer = require('puppeteer')
 
 program
   .version(pjson.version)
@@ -229,7 +230,7 @@ program
           process.exit(1)
         }
 
-        return processJob(job, configuration)
+        return puppeteer.launch().then(browser => processJob(browser, job, configuration))
       })
       .catch(handleDbError)
   })
@@ -405,7 +406,7 @@ program
           process.exit(0)
         }
 
-        return processJob(next, configuration)
+        return puppeteer.launch().then(browser => processJob(browser, next, configuration))
       })
       .catch(handleDbError)
   })
@@ -423,7 +424,7 @@ program
           process.exit(0)
         }
 
-        var shiftAll = function () {
+        var shiftAll = function (browser) {
           var maxTries = configuration.queue.generationMaxTries
           var retryStrategy = configuration.queue.generationRetryStrategy
           var parallelism = configuration.queue.parallelism
@@ -431,29 +432,31 @@ program
           return queue.getAllUnfinished(retryStrategy, maxTries)
             .then(function (jobs) {
               if (jobs.length === 0) {
-                queue.close()
-                process.exit(0)
+                browser.close().then(() => {
+                  queue.close()
+                  process.exit(0)
+                })
               }
 
               var chunks = chunk(jobs, parallelism)
 
               function runNextChunk(k = 1) {
                 if (chunks.length === 0) {
-                  queue.setIsBusy(false).then(shiftAll)
+                  queue.setIsBusy(false).then(() => shiftAll(browser))
                 } else {
                   var chunk = chunks.shift()
                   console.log('Running chunk %s, %s chunks left', k, chunks.length)
 
                   var promises = []
                   for(var i in chunk) {
-                    promises.push(processJob(chunk[i], clone(configuration), false))
+                    promises.push(processJob(browser, chunk[i], clone(configuration), false))
                   }
 
                   Promise.all(promises)
                     .then(function(){
                       return runNextChunk(k + 1)
                     })
-                    .catch(function(){
+                    .catch(function(e){
                       return queue.setIsBusy(false).then(function() {
                         queue.close()
                         process.exit(1)
@@ -470,7 +473,7 @@ program
             })
         }
 
-        return shiftAll()
+        return puppeteer.launch().then(browser => shiftAll(browser))
       })
       .catch(handleDbError)
   })
@@ -481,15 +484,14 @@ if (!process.argv.slice(2).length) {
   program.outputHelp();
 }
 
-function processJob(job, configuration, exitProcess = true) {
+function processJob(browser, job, configuration, exitProcess = true) {
   var generatorOptions = configuration.generator
   var storagePlugins = configuration.storage
 
   var generator = createPdfGenerator(configuration.storagePath, generatorOptions, storagePlugins)
 
-  return queue.processJob(generator, job, configuration.webhook).then(function (response) {
+  return queue.processJob(browser, generator, job, configuration.webhook).then(function (response) {
     if (error.isError(response)) {
-      console.error(response.message)
       if (exitProcess) {
         queue.close()
         process.exit(1)
