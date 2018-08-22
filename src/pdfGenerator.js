@@ -103,7 +103,7 @@ function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
         var errorResponse = error.createErrorResponse(error.ERROR_PUPPETEER)
         errorResponse.message = e
 
-        return errorResponse
+        return Object.assign(createResponseObject(), errorResponse)
       })
     })
   }
