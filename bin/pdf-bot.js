@@ -492,6 +492,7 @@ function processJob(browser, job, configuration, exitProcess = true) {
 
   return queue.processJob(browser, generator, job, configuration.webhook).then(function (response) {
     if (error.isError(response)) {
+      console.log('Job ID ' + job.id + ' failed. ' + response.message)
       if (exitProcess) {
         queue.close()
         process.exit(1)
