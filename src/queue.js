@@ -44,8 +44,13 @@ function addToQueue (db, data) {
     return error.createErrorResponse(error.ERROR_META_IS_NOT_OBJECT)
   }
 
+  if (data.doctype && typeof data.doctype !== 'string') {
+    return error.createErrorResponse(error.ERROR_DOCTYPE_IS_NOT_STRING)
+  }
+
   data = Object.assign(defaults, data, {
     id: id,
+    doctype: data.doctype || '',
     created_at: createdAt,
     completed_at: null,
     generations: [],

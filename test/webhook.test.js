@@ -5,6 +5,7 @@ var fetch = require('node-fetch')
 var job = {
   id: 1,
   url: 'http://localhost',
+  doctype: '',
   meta: {
     id: 1
   },
@@ -83,7 +84,7 @@ describe('webhook', function() {
     }
 
     if (fetchOptions.body !== JSON.stringify(job)) {
-      throw new Error('Body was not correct.')
+      throw new Error('Body was not correct. ' + JSON.stringify(fetchOptions) + '\n\n' + JSON.stringify(job))
     }
   })
 

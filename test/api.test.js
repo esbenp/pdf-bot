@@ -73,7 +73,7 @@ describe('api: POST /', function () {
       .end(function (err, res) {
         if (err) return done(err)
 
-        if (!addToQueue.calledWith({ url: 'https://google.com', meta: meta })) {
+        if (!addToQueue.calledWith({ url: 'https://google.com', meta: meta, doctype: ''})) {
           throw new Error('Queue was not called with correct url')
         }
 
