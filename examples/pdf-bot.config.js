@@ -7,9 +7,9 @@ module.exports = {
     token: 'api-token'
   },
   db: pgsql({
-    user: 'pdfbot',
+    user: regabot',
     password: 'pdfbot',
-    database: 'pdfbot'
+    database: 'regabot'
   }),
   // html-pdf-chrome options
   generator: {
