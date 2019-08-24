@@ -26,9 +26,12 @@
     "test:watch": "mocha -w test/*.test.js --recursive"
   },
   "dependencies": {
+    "aws-sdk": "^2.516.0",
     "body-parser": "^1.17.2",
+    "bull": "^3.10.0",
+    "bull-arena": "^2.6.3",
     "cli-table": "^0.3.1",
-    "commander": "^2.11.0",
+    "commander": "3.0.0",
     "debug": "^2.6.8",
     "express": "^4.15.3",
     "html-pdf-chrome": "^0.4.2",
@@ -39,7 +42,7 @@
     "node-fetch": "^1.7.1",
     "pg": "^7.4.0",
     "prompt": "^1.0.0",
-    "puppeteer": "^1.7.0",
+    "puppeteer": "1.7.0",
     "s3": "^4.4.0",
     "uuid": "^3.1.0"
   },

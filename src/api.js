@@ -5,7 +5,7 @@ var debug = require('debug')('pdf:api')
 var error = require('./error')
 var childProcess = require('child_process')
 
-function createApi(createQueue, options = {}) {
+function createApi(inboundQueue, options = {}) {
   var api = express()
   api.use(bodyParser.json())
 
@@ -16,7 +16,6 @@ function createApi(createQueue, options = {}) {
   }
 
   api.post('/', function(req, res) {
-    var queue = createQueue()
     var authHeader = req.get('Authorization')
 
     if (token && (!authHeader || authHeader.replace(/Bearer (.*)$/i, '$1') !== token)) {
@@ -24,24 +23,20 @@ function createApi(createQueue, options = {}) {
       return
     }
 
-    queue
-      .addToQueue({
+    inboundQueue.add(
+      {
         url: req.body.url,
-        meta: req.body.meta || {}
-      }).then(function (response) {
-        queue.close()
-
-        if (error.isError(response)) {
-          res.status(422).json(response)
-          return
-        }
-
-        if (options.postPushCommand && options.postPushCommand.length > 0) {
-          childProcess.spawn.apply(null, options.postPushCommand)
-        }
-
-        res.status(201).json(response)
-      })
+        meta: req.body.meta || {},
+        priority: req.body.priority
+      },{
+        priority: req.body.priority,
+        attempts: 5
+      }
+    ).then(job => {
+      res.status(204).json(null)
+    }).catch(err => {
+      res.status(422).json({ error: err.toString() })
+    })
   })
 
   return api

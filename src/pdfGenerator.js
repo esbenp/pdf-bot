@@ -1,115 +1,61 @@
-var path = require('path')
 var puppeteer = require('puppeteer')
-var uuid = require('uuid')
-var debug = require('debug')('pdf:generator')
-var error = require('./error')
-var uuid = require('uuid')
-var utils = require('./utils')
 
-function createPdfGenerator(storagePath, options = {}, storagePlugins = {}) {
-  return function createPdf (browser, url, job) {
-    debug('Creating PDF for url %s with options %s', url, JSON.stringify(options))
+const pdfGeneratorBull = async (job) => {
+  const browser = await puppeteer.launch()
 
-    var generationId = uuid()
-    var generated_at = utils.getCurrentDateTimeAsString()
-    var jobId = job.id
+  try {
+    const page = await browser.newPage()
 
-    function createResponseObject() {
-      return {
-        id: generationId,
-        generated_at: generated_at
+    try {
+      const logger = new InflightRequests(page)
+
+      await page.goto(job.data.url, { timeout: 45000, waitUntil: 'networkidle2' })
+      await page.waitForSelector('#traede-pdf', { timeout: 20000 })
+      // remove?
+
+      let inflightRequests = logger.inflightRequests()
+      const maxWait = 60000
+      const startTime = new Date().getTime()
+      let timePassed = 0
+
+      while(inflightRequests.length > 2 && timePassed < maxWait) {
+        inflightRequests = logger.inflightRequests()
+
+        timePassed = new Date().getTime() - startTime
+
+        console.log('Inflight length is ' + inflightRequests.length + ' and ' + timePassed + ' has passed')
+        console.log(inflightRequests.map(r => r.url()))
       }
+
+      logger.dispose()
+
+      await page.pdf({
+        landscape: job.data.meta.landscape === true,
+        margin: {
+          bottom: 10,
+          left: 30,
+          right: 30,
+          top: 10
+        },
+        path: job.data.storage_path
+      })
+    } catch (e) {
+      await page.close()
+
+      throw e
     }
 
-    var pdfPath = path.join(storagePath, 'pdf', (job.id + '.pdf'))
+    await page.close()
+  } catch (e) {
+    await browser.close()
 
-    return browser.newPage().then(page => {
-      return new Promise((resolve, reject) => {
-        const logger = new InflightRequests(page)
-        page
-          .goto(url)
-          .then(() => {
-            var timer = setTimeout(() => {
-              console.log(logger.inflightRequests().map(r => r.url()).join("\n"))
-              reject(job.id + ' failed timeout.')
-            }, 60000)
-
-            page.exposeFunction("htmlPdfCb", () => {
-              clearTimeout(timer)
-              resolve()
-            })
-          })
-      }).then(() => {
-        return page
-              .pdf({
-                margin: {
-                  bottom: 10,
-                  left: 30,
-                  right: 30,
-                  top: 10
-                },
-                path: pdfPath
-              })
-              .then((pdf) => {
-                debug('Saving PDF to %s', pdfPath)
-
-                var storage = {
-                  local: pdfPath
-                }
-                var storagePluginPromises = []
-                for (var i in storagePlugins) {
-                  // Because i will change before the promise is resolved
-                  // we use a self executing function to inject the variable
-                  // into a different scope
-                  var then = (function(type) {
-                    return function (response) {
-                      return Object.assign(response, {
-                        type: type
-                      })
-                    }
-                  })(i)
-
-                  storagePluginPromises.push(
-                    storagePlugins[i](pdfPath, job).then(then)
-                  )
-                }
-
-                return Promise.all(storagePluginPromises).then(responses => {
-                  for(var i in responses) {
-                    var response = responses[i]
-
-                    storage[response.type] = {
-                      path: response.path,
-                      meta: response.meta || {}
-                    }
-                  }
-
-                  return Object.assign(
-                    createResponseObject(),
-                    {
-                      storage: storage
-                    }
-                  )
-                })
-              })
-              .catch(msg => {
-                var response = error.createErrorResponse(error.ERROR_HTML_PDF_CHROME_ERROR)
-
-                response.message += ' ' + msg + ' (job ID: ' + jobId + '. Generation ID: ' + generationId + ')'
-
-                return Object.assign(createResponseObject(), response)
-              })
-      }).catch((e) => {
-        var errorResponse = error.createErrorResponse(error.ERROR_PUPPETEER)
-        errorResponse.message = e
-
-        return Object.assign(createResponseObject(), errorResponse)
-      })
-    })
+    throw e
   }
+
+  await browser.close()
 }
 
-module.exports = createPdfGenerator
+module.exports = pdfGeneratorBull
 
 class InflightRequests {
   constructor(page) {
@@ -117,24 +63,29 @@ class InflightRequests {
     this._requests = new Set();
     this._onStarted = this._onStarted.bind(this);
     this._onFinished = this._onFinished.bind(this);
-    this._onError = this._onError.bind(this);
+
     this._page.on('request', this._onStarted);
     this._page.on('requestfinished', this._onFinished);
     this._page.on('requestfailed', this._onFinished);
-    this._page.on('error', this._onError);
-    this._page.on('disconnected', () => {
-      console.log('yooooo')
-    })
-
   }
 
-  _onStarted(request) { this._requests.add(request); }
-  _onFinished(request) { this._requests.delete(request); }
-  _onError(error) {
-    console.log(error)
+  _onStarted(request) {
+    this._requests.add(request);
+  }
+  _onFinished(request) {
+    this._requests.delete(request);
   }
 
-  inflightRequests() { return Array.from(this._requests); }
+  inflightRequests() {
+    const pageUrl = this._page.url()
+
+    // for some reason cloudinary requests will not finished when requested on a local page
+    if (pageUrl.match(/\.localhost\:3000/)) {
+      return []
+    }
+
+    return Array.from(this._requests).filter(r => r.url().match(/cloudinary\.com|traede\.com/));
+  }
 
   dispose() {
     this._page.removeListener('request', this._onStarted);

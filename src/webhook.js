@@ -5,7 +5,9 @@ var uuid = require('uuid')
 var error = require('./error')
 var utils = require('./utils')
 
-function ping (job, options) {
+const ping = async (job) => {
+  const options = job.data.webhook
+
   if (!options.url || !utils.isValidUrl(options.url)) {
     throw new Error('Webhook is not valid url.')
   }
@@ -21,11 +23,18 @@ function ping (job, options) {
   requestOptions.method = 'POST'
   headerOptions['Content-Type'] = 'application/json'
 
+  const storage = {}
+  for(let storageResponse of job.data.storage_responses) {
+    storage[storageResponse.type] = {
+      ...storageResponse
+    }
+  }
+
   var bodyRaw = {
-    id: job.id,
-    url: job.url,
-    meta: job.meta,
-    storage: job.storage
+    id: job.data.id,
+    url: job.data.url,
+    meta: job.data.meta,
+    storage: storage
   }
   var body = JSON.stringify(bodyRaw)
 
@@ -79,10 +88,7 @@ function ping (job, options) {
     })
 }
 
-module.exports = {
-  generateSignature: generateSignature,
-  ping: ping
-}
+module.exports = ping
 
 function generateSignature (payload, key) {
   return crypto.createHmac('sha1', key).update(payload).digest('hex')

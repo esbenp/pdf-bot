@@ -1,6 +1,7 @@
 var debug = require('debug')('pdf:s3')
-var s3 = require('s3')
+var AWS = require('aws-sdk');
 var path = require('path')
+var fs = require('fs')
 
 function createS3Storage(options = {}) {
   if (!options.accessKeyId) {
@@ -21,17 +22,11 @@ function createS3Storage(options = {}) {
 
   return function uploadToS3 (localPath, job) {
     return new Promise((resolve, reject) => {
-      var client = s3.createClient(
-          Object.assign(options.s3ClientOptions || {},
-          {
-            s3Options: {
-              accessKeyId: options.accessKeyId,
-              secretAccessKey: options.secretAccessKey,
-              region: options.region,
-            }
-          }
-        )
-      )
+      var client = new AWS.S3({
+        accessKeyId: options.accessKeyId,
+        secretAccessKey: options.secretAccessKey,
+        region: options.region,
+      })
 
       var remotePath = (options.path || '')
       if (typeof options.path === 'function') {
@@ -42,30 +37,29 @@ function createS3Storage(options = {}) {
       var fileName = pathSplitted[pathSplitted.length - 1]
       var fullRemotePath = path.join(remotePath, fileName)
 
-      var uploadOptions = {
-        localFile: localPath,
-
-        s3Params: {
-          Bucket: options.bucket,
-          Key: fullRemotePath,
-        },
-      }
+      var Key = fullRemotePath
+      var Body = fs.readFileSync(localPath)
 
       debug('Pushing job ID %s to S3 path: %s/%s', job.id, options.bucket, fileName)
 
-      var uploader = client.uploadFile(uploadOptions);
-      uploader.on('error', function(err) {
-        reject(err)
-      });
-      uploader.on('end', function(data) {
+      client.putObject({
+        Bucket: options.bucket,
+        Key: Key,
+        Body: Body
+      })
+      .promise()
+      .then(function (data) {
         resolve({
           path: {
-            bucket: uploadOptions.s3Params.Bucket,
+            bucket: options.bucket,
             region: options.region,
-            key: uploadOptions.s3Params.Key
+            key: Key
           }
         })
-      });
+      })
+      .catch(function (err) {
+        reject(err)
+      })
     })
   }
 }
