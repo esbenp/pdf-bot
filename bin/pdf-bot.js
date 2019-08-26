@@ -90,7 +90,7 @@ function start() {
 
   pdfQueue.on('error', createErrorLog('Error in pdf queue'))
   pdfQueue.on('failed', createFailLog('Failed pdf'))
-  pdfQueue.process(program.concurrency || 1, path.join(process.cwd(), '/src/pdfGenerator.js'))
+  pdfQueue.process(parseInt(program.concurrency || 1), path.join(process.cwd(), '/src/pdfGenerator.js'))
   pdfQueue.on('completed', (job) => {
     var log = `Process complete ${parseUrl(job)}`
 

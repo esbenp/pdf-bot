@@ -1,6 +1,6 @@
 var puppeteer = require('puppeteer')
 
-const pdfGeneratorBull = async (job) => {
+const pdfGenerator = async (job) => {
   const browser = await puppeteer.launch()
 
   try {
@@ -55,7 +55,7 @@ const pdfGeneratorBull = async (job) => {
   await browser.close()
 }
 
-module.exports = pdfGeneratorBull
+module.exports = pdfGenerator
 
 class InflightRequests {
   constructor(page) {
