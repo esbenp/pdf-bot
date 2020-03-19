@@ -38,7 +38,7 @@ function ping (job, options) {
 
   var headers = new fetch.Headers()
   for(var i in headerOptions) {
-    headers.set(i, headerOptions[i])
+    try { headers.set(i, headerOptions[i]) } catch (_e) {};
   }
 
   requestOptions.headers = headers
