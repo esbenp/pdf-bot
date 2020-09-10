@@ -36,7 +36,7 @@
     "lodash.clonedeep": "^4.5.0",
     "lodash.merge": "^4.6.0",
     "lowdb": "^0.16.2",
-    "node-fetch": "^1.7.1",
+    "node-fetch": "^2.6.1",
     "pg": "^7.4.0",
     "prompt": "^1.0.0",
     "s3": "^4.4.0",
