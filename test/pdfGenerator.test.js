@@ -66,6 +66,7 @@ describe('PDF Generator', function() {
     createStub.onCall(0).returns(new Promise((resolve, reject) => reject('error')))
 
     createGenerator('storage', {}, {})('url', {id: 1}).then(response => {
+      console.log(JSON.stringify(response))
       if (!error.isError(response)) {
         throw new Exception('Generator rejection did not resolve in error promise')
       }

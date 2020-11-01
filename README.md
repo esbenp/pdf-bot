@@ -269,6 +269,7 @@ key | type | required | description
 --- | ---- | -------- | -----------
 url | string | yes | The URL to generate a PDF from
 meta | object | | Optional meta data object to send back to the webhook url
+doctype | string | | Optional identifier to use special configuration settings per document
 
 #### Example
 
@@ -365,6 +366,60 @@ module.exports = {
 }
 
 ```
+
+## Document Level Settings
+Optionally, you can specify different settings using a document type identifier for your documents.
+
+This allows for using document specific webhook, generator options (such as printOptions), or storage configurations.
+
+```javascript
+
+module.exports = {
+  // The settings of the API
+  api: {
+    // The port your express.js instance listens to requests from. (default: 3000)
+    port: 3000,
+    // Spawn command when a job has been pushed to the API
+    postPushCommand: ['/home/user/.npm-global/bin/pdf-bot', ['-c', './pdf-bot.config.js', 'shift:all']],
+    // The token used to validate requests to your API. Not required, but 100% recommended.
+    token: 'api-token'
+  },
+
+  document: {
+    //a label for configuration to refer to in requests
+    'foo_doc': {
+        storagekey: 's3',
+        generator: {
+            printOptions: {
+                //... special print options here (like margins and headers)
+            }
+        },
+        //override webhook
+        webhook: {
+            // The endpoint to send PDF messages to.
+            url: 'http://localhost:3000/webhooks/foo_pdf'
+        }
+    }
+    'bar_doc': {
+        //use default generator settings
+        //override webhook
+        webhook: {
+            // The endpoint to send PDF messages to.
+            url: 'http://localhost:3000/webhooks/bar_pdf'
+        }
+    }
+  }
+  // html-pdf-chrome
+  generator: {
+    // Triggers that specify when the PDF should be generated
+    completionTrigger: new htmlPdf.CompletionTrigger.Timer(1000), // waits for 1 sec
+    // The port to listen for Chrome (default: 9222)
+    port: 9222
+  }
+  // ... other options
+}
+```
+
 
 ## Options
 

@@ -39,23 +39,20 @@ var defaultConfig = {
   },
   db: lowDb(),
   // html-pdf-chrome options
-  generator: {
-
-  },
+  generator: {},
   queue: {
-    generationRetryStrategy: function(job, retries) {
+    generationRetryStrategy: function (job, retries) {
       return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
     },
     generationMaxTries: 5,
     parallelism: 4,
-    webhookRetryStrategy: function(job, retries) {
+    webhookRetryStrategy: function (job, retries) {
       return decaySchedule[retries - 1] ? decaySchedule[retries - 1] : 0
     },
     webhookMaxTries: 5,
-    lowDbOptions: {
-
-    }
+    lowDbOptions: {}
   },
+  document: {},
   storage: {
     /*
     's3': createS3Config({
@@ -93,7 +90,7 @@ program
       port: port,
       postPushCommand: apiOptions.postPushCommand,
       token: apiOptions.token
-    }).listen(port, function() {
+    }).listen(port, function () {
       debug('Listening to port %d', port)
     })
   })
@@ -106,17 +103,17 @@ program
     function startPrompt() {
       prompt.start({noHandleSIGINT: true})
       prompt.get([
-      {
-        name: 'storagePath',
-        description: 'Enter a path for storage',
-        default: path.join(process.cwd(), 'pdf-storage'),
-        required: true
-      },
-      {
-        name: 'token',
-        description: 'An access token for your API',
-        required: false
-      }], function (err, result) {
+        {
+          name: 'storagePath',
+          description: 'Enter a path for storage',
+          default: path.join(process.cwd(), 'pdf-storage'),
+          required: true
+        },
+        {
+          name: 'token',
+          description: 'An access token for your API',
+          required: false
+        }], function (err, result) {
         if (err) {
           process.exit(0)
         }
@@ -170,7 +167,7 @@ program
 
 program
   .command('db:migrate')
-  .action(function() {
+  .action(function () {
     openConfig()
 
     var db = configuration.db(configuration)
@@ -186,7 +183,7 @@ program
 
 program
   .command('db:destroy')
-  .action(function() {
+  .action(function () {
     openConfig()
 
     var db = configuration.db(configuration)
@@ -205,7 +202,7 @@ program
         process.exit(0)
       } else {
         db.destroy()
-          .then(function() {
+          .then(function () {
             console.log('The database has been destroyed.')
             db.close()
             process.exit(0)
@@ -218,8 +215,7 @@ program
 program
   .command('generate [jobID]')
   .description('Generate PDF for job')
-  .action(function (jobId, options){
-    openConfig()
+  .action(function (jobId, options) {
 
     return queue.getById(jobId)
       .then(function (job) {
@@ -228,7 +224,7 @@ program
           queue.close()
           process.exit(1)
         }
-
+        openConfig(false, job.doctype)
         return processJob(job, configuration)
       })
       .catch(handleDbError)
@@ -244,7 +240,7 @@ program
     openConfig()
 
     return listJobs(queue, options.failed, options.completed, options.limit)
-      .then(function() {
+      .then(function () {
         queue.close()
         process.exit(0)
       })
@@ -264,7 +260,7 @@ program
           console.log('Job not found.')
           return;
         }
-
+        openConfig(false, job.doctype)
         return ping(job, configuration.webhook).then(response => {
           queue.close()
 
@@ -280,8 +276,8 @@ program
 
 program
   .command('ping:retry-failed')
-  .action(function() {
-    openConfig()
+  .action(function () {
+
 
     var maxTries = configuration.queue.webhookMaxTries
     var retryStrategy = configuration.queue.webhookRetryStrategy
@@ -292,7 +288,7 @@ program
           queue.close()
           process.exit(0)
         }
-
+        openConfig(false, next.doctype)
         return ping(next, configuration.webhook).then(function (response) {
           queue.close()
 
@@ -325,7 +321,7 @@ program
           colWidths: [40, 40, 50, 20, 20, 20]
         });
 
-        for(var i in job.pings) {
+        for (var i in job.pings) {
           var ping = job.pings[i]
 
           table.push([
@@ -367,13 +363,15 @@ program
   .command('push [url]')
   .description('Push new job to the queue')
   .option('-m, --meta [meta]', 'JSON string with meta data. Default: \'{}\'')
+  .option('-d, --doctype [doctype]', 'Document identifier to use alternate configuration. Default: \'\'')
   .action(function (url, options) {
     openConfig()
 
     return queue
       .addToQueue({
         url: url,
-        meta: JSON.parse(options.meta || '{}')
+        meta: JSON.parse(options.meta || '{}'),
+        doctype: options.doctype || ''
       })
       .then(function (response) {
         queue.close()
@@ -404,6 +402,8 @@ program
           queue.close()
           process.exit(0)
         }
+        //have to repull the document specific configuration, if type has changed
+        if (next.doctype) openConfig(false, next.doctype)
 
         return processJob(next, configuration)
       })
@@ -415,6 +415,11 @@ program
   .description('Run all unfinished jobs in the queue')
   .action(function (url) {
     openConfig()
+    const defaulttype = '__default'
+    var docConfigLookup = {
+      '__default': configuration
+    }
+
 
     return queue.isBusy()
       .then(function (isBusy) {
@@ -445,16 +450,26 @@ program
                   console.log('Running chunk %s, %s chunks left', k, chunks.length)
 
                   var promises = []
-                  for(var i in chunk) {
-                    promises.push(processJob(chunk[i], clone(configuration), false))
+                  for (var i in chunk) {
+                    var next = chunk[i]
+                    var doctype = next.doctype ? next.doctype : defaulttype
+
+                    if (!docConfigLookup.hasOwnProperty(doctype)) {
+                      openConfig(doctype)
+                      docConfigLookup[doctype] = configuration
+                    }
+
+                    configuration = docConfigLookup[defaulttype]
+
+                    promises.push(processJob(next, clone(configuration), false))
                   }
 
                   Promise.all(promises)
-                    .then(function(){
+                    .then(function () {
                       return runNextChunk(k + 1)
                     })
-                    .catch(function(){
-                      return queue.setIsBusy(false).then(function() {
+                    .catch(function () {
+                      return queue.setIsBusy(false).then(function () {
                         queue.close()
                         process.exit(1)
                       })
@@ -481,6 +496,7 @@ if (!process.argv.slice(2).length) {
   program.outputHelp();
 }
 
+
 function processJob(job, configuration, exitProcess = true) {
   var generatorOptions = configuration.generator
   var storagePlugins = configuration.storage
@@ -504,7 +520,32 @@ function processJob(job, configuration, exitProcess = true) {
   })
 }
 
-function openConfig(delayQueueCreation = false) {
+function processConfiguration(configuration, doctype = '') {
+  var defaultGeneratorOpts = configuration.generator || {}
+  var defaultWebhookOpts = configuration.webhook
+  var storagePlugins = configuration.storage || {}
+  var documentOptions = configuration.document || {}
+
+  var docgen = (documentOptions[doctype] && documentOptions[doctype].generator)
+    ? documentOptions[doctype].generator : defaultGeneratorOpts
+
+  var generator = Object.assign(defaultGeneratorOpts, docgen)
+
+  var docSpecificConfig = {
+    //webhooks use the doc specific config or the default config
+    webhook: (documentOptions[doctype] && documentOptions[doctype].webhook) ? documentOptions[doctype].webhook : defaultWebhookOpts,
+    storage: (documentOptions[doctype] && documentOptions[doctype].storagekey && storagePlugins[documentOptions[doctype].storagekey])
+      ? storagePlugins[documentOptions[doctype].storagekey]
+      : storagePlugins,
+    //generators use the default config with changes from the document specific config, if present
+    generator: generator
+  }
+
+  return Object.assign(configuration, docSpecificConfig)
+}
+
+
+function openConfig(delayQueueCreation = false, doctype = '') {
   configuration = defaultConfig
 
   if (!program.config) {
@@ -532,6 +573,8 @@ function openConfig(delayQueueCreation = false) {
     throw new Error('There is no pdf folder in the storage folder. Create it: storage/pdf')
   }
 
+  configuration = processConfiguration(configuration, doctype)
+
   function initiateQueue() {
     var db = configuration.db(configuration)
     var queueOptions = configuration.queue
@@ -553,16 +596,17 @@ function listJobs(queue, failed = false, limit) {
         limit
       ).then(function (response) {
         var table = new Table({
-          head: ['ID', 'URL', 'Meta', 'PDF Gen. tries', 'Created at', 'Completed at'],
-          colWidths: [40, 40, 50, 20, 20, 20]
+          head: ['ID', 'URL', 'Doc Type', 'Meta', 'PDF Gen. tries', 'Created at', 'Completed at'],
+          colWidths: [40, 40, 20, 45, 20, 20, 20]
         });
 
-        for(var i in response) {
+        for (var i in response) {
           var job = response[i]
 
           table.push([
             job.id,
             job.url,
+            job.doctype,
             JSON.stringify(job.meta),
             job.generations.length,
             formatDate(job.created_at),

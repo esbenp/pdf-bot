@@ -24,6 +24,7 @@ function ping (job, options) {
   var bodyRaw = {
     id: job.id,
     url: job.url,
+    doctype: job.doctype,
     meta: job.meta,
     storage: job.storage
   }

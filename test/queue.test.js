@@ -80,7 +80,8 @@ describe('queue : retrieval', function() {
   it('should create error when passing invalid meta', function() {
     var response = queue.addToQueue({
       meta: 'not-object',
-      url: 'http://localhost'
+      url: 'http://localhost',
+      doctype: 'foo'
     })
 
     assert(response.error)
@@ -92,6 +93,7 @@ describe('queue : retrieval', function() {
       meta: {
         hello: true
       },
+      doctype: '',
       url: 'http://localhost'
     })
 
