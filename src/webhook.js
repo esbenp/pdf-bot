@@ -1,71 +1,72 @@
-var crypto = require('crypto')
-var debug = require('debug')('pdf:webhook')
-var fetch = require('node-fetch')
-var uuid = require('uuid')
-var error = require('./error')
-var utils = require('./utils')
+var crypto = require("crypto");
+var debug = require("debug")("pdf:webhook");
+var fetch = require("node-fetch");
+var uuid = require("uuid");
+var error = require("./error");
+var utils = require("./utils");
 
 const ping = async (job) => {
-  const options = job.data.webhook
+  const options = job.data.webhook;
 
   if (!options.url || !utils.isValidUrl(options.url)) {
-    throw new Error('Webhook is not valid url.')
+    throw new Error("Webhook is not valid url.");
   }
 
   if (!options.secret) {
-    throw new Error('You need to supply a secret for your webhooks')
+    throw new Error("You need to supply a secret for your webhooks");
   }
 
-  var requestOptions = options.requestOptions || {}
+  var requestOptions = options.requestOptions || {};
 
-  var headerOptions = requestOptions.headers || {}
+  var headerOptions = requestOptions.headers || {};
 
-  requestOptions.method = 'POST'
-  headerOptions['Content-Type'] = 'application/json'
+  requestOptions.method = "POST";
+  headerOptions["Content-Type"] = "application/json";
 
-  const storage = {}
-  for(let storageResponse of job.data.storage_responses) {
+  const storage = {};
+  for (let storageResponse of job.data.storage_responses) {
     storage[storageResponse.type] = {
-      ...storageResponse
-    }
+      ...storageResponse,
+    };
   }
 
   var bodyRaw = {
     id: job.data.id,
     url: job.data.url,
     meta: job.data.meta,
-    storage: storage
+    timings: job.data.timings,
+    storage: storage,
+  };
+  var body = JSON.stringify(bodyRaw);
+
+  var signature = generateSignature(body, options.secret);
+
+  var requestId = uuid();
+  var namespace = options.headerNamespace || "X-PDF-";
+  headerOptions[namespace + "Transaction"] = requestId;
+  headerOptions[namespace + "Signature"] = signature;
+
+  var headers = new fetch.Headers();
+  for (var i in headerOptions) {
+    headers.set(i, headerOptions[i]);
   }
-  var body = JSON.stringify(bodyRaw)
 
-  var signature = generateSignature(body, options.secret)
-
-  var requestId = uuid()
-  var namespace = options.headerNamespace || 'X-PDF-'
-  headerOptions[namespace + 'Transaction'] = requestId
-  headerOptions[namespace + 'Signature'] = signature
-
-  var headers = new fetch.Headers()
-  for(var i in headerOptions) {
-    headers.set(i, headerOptions[i])
-  }
-
-  requestOptions.headers = headers
-  requestOptions.body = body
+  requestOptions.headers = headers;
+  requestOptions.body = body;
 
   debug(
-    'Pinging job ID %s at URL %s with request options %s',
+    "Pinging job ID %s at URL %s with request options %s",
     job.id,
     options.url,
     JSON.stringify(requestOptions)
-  )
+  );
 
-  var sent_at = utils.getCurrentDateTimeAsString()
+  var sent_at = utils.getCurrentDateTimeAsString();
 
-  function createResponse (response, error) {
-    var status = response.status
+  function createResponse(response, error) {
+    var status = response.status;
 
-    return getContentBody(response).then(body => {
+    return getContentBody(response).then((body) => {
       return {
         id: requestId,
         status: response.status,
@@ -74,59 +75,59 @@ const ping = async (job) => {
         response: body,
         url: options.url,
         sent_at: sent_at,
-        error: !response.ok
-      }
-    })
+        error: !response.ok,
+      };
+    });
   }
 
   return fetch(options.url, requestOptions)
     .then(function (response) {
-      return createResponse(response, !response.ok)
+      return createResponse(response, !response.ok);
     })
     .catch(function (response) {
-      return createResponse(response, true)
-    })
+      return createResponse(response, true);
+    });
+};
+
+module.exports = ping;
+
+function generateSignature(payload, key) {
+  return crypto.createHmac("sha1", key).update(payload).digest("hex");
 }
 
-module.exports = ping
-
-function generateSignature (payload, key) {
-  return crypto.createHmac('sha1', key).update(payload).digest('hex')
-}
-
-function getContentBody (response) {
-  return new Promise(function(resolve){
-    var emptyCodes = [204, 205]
+function getContentBody(response) {
+  return new Promise(function (resolve) {
+    var emptyCodes = [204, 205];
     if (emptyCodes.indexOf(response.status) !== -1) {
-      resolve({})
+      resolve({});
     }
 
     // Happens for instance on ECONNREFUSED
     if (!(response instanceof fetch.Response)) {
-      resolve(response)
+      resolve(response);
     }
 
-    var contentType = response.headers.get('content-type');
-    if (contentType.indexOf('json') === -1) {
-      return response.text().then(resolve)
+    var contentType = response.headers.get("content-type");
+    if (contentType.indexOf("json") === -1) {
+      return response.text().then(resolve);
     }
 
-    return response.text().then(text => {
+    return response.text().then((text) => {
       if (!text) {
         return resolve({});
       }
       try {
-        return resolve(JSON.parse(text))
+        return resolve(JSON.parse(text));
       } catch (e) {
         return resolve(
           Object.assign(
             error.createErrorResponse(error.ERROR_INVALID_JSON_RESPONSE),
             {
-              response: text
+              response: text,
             }
           )
-        )
+        );
       }
-    })
-  })
+    });
+  });
 }
